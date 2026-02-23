@@ -15,9 +15,9 @@ export const HOTBAR_BLOCKS = [
 const ICON_PX = 64;
 
 function renderCubeIcon(canvas: HTMLCanvasElement, blockType: number) {
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(ICON_PX, ICON_PX);
-  renderer.setClearColor(0x8b8b8b, 1);
+  renderer.setClearColor(0x000000, 0);
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
@@ -45,8 +45,10 @@ function renderCubeIcon(canvas: HTMLCanvasElement, blockType: number) {
   const mat = new THREE.MeshStandardMaterial({ map: atlas, roughness: 1, metalness: 0 });
   scene.add(new THREE.Mesh(geo, mat));
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
   dir.position.set(1, 2, 2);
   scene.add(dir);
 
@@ -91,10 +93,9 @@ export function HotBar({ selectedIndex, onSelect }: HotBarProps) {
       bottom: 24,
       left: '50%',
       transform: 'translateX(-50%)',
-      display: 'flex',
-      gap: 4,
       zIndex: 100,
     }}>
+    <div className="mc-hotbar">
       {HOTBAR_BLOCKS.map((blockType, i) => {
         const isSelected = i === selectedIndex;
         return (
@@ -115,6 +116,7 @@ export function HotBar({ selectedIndex, onSelect }: HotBarProps) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
