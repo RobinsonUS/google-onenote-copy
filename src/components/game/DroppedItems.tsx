@@ -60,7 +60,7 @@ interface DroppedItemsProps {
 
 export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: DroppedItemsProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const meshesRef = useRef<Map<number, THREE.Mesh>>(new Map());
+  const meshesRef = useRef<Map<number, THREE.Group>>(new Map());
   const geoCache = useRef<Map<number, THREE.BoxGeometry>>(new Map());
   
   const atlas = useMemo(() => getBlockAtlasTexture(), []);
@@ -151,15 +151,32 @@ export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: Dro
 
       activeIds.add(item.id);
 
-      // Create or update mesh
-      let mesh = meshesRef.current.get(item.id);
-      if (!mesh) {
-        mesh = new THREE.Mesh(getGeo(item.blockType), mat);
-        meshesRef.current.set(item.id, mesh);
-        group.add(mesh);
+      const displayCount = item.count >= 3 ? 3 : item.count;
+
+      // Create or update group
+      let itemGroup = meshesRef.current.get(item.id);
+      if (!itemGroup || (itemGroup as any).__displayCount !== displayCount) {
+        // Remove old
+        if (itemGroup) {
+          group.remove(itemGroup);
+        }
+        itemGroup = new THREE.Group();
+        (itemGroup as any).__displayCount = displayCount;
+        const offsets = displayCount === 1
+          ? [[0, 0, 0]]
+          : displayCount === 2
+            ? [[-0.08, 0, -0.08], [0.08, 0.06, 0.08]]
+            : [[-0.1, 0, -0.1], [0.1, 0.05, 0.08], [0, 0.1, -0.05]];
+        for (const [ox, oy, oz] of offsets) {
+          const m = new THREE.Mesh(getGeo(item.blockType), mat);
+          m.position.set(ox, oy, oz);
+          itemGroup.add(m);
+        }
+        meshesRef.current.set(item.id, itemGroup);
+        group.add(itemGroup);
       }
-      mesh.position.set(item.x, item.y + Math.sin(item.age * 2) * 0.08, item.z);
-      mesh.rotation.y = item.age * 1.5;
+      itemGroup.position.set(item.x, item.y + Math.sin(item.age * 2) * 0.08, item.z);
+      itemGroup.rotation.y = item.age * 1.5;
     }
 
     // Remove old meshes
