@@ -1,12 +1,13 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { BLOCK_THREE_COLORS } from "@/lib/terrain";
+import { getBlockAtlasTexture, getBlockUV } from "@/lib/textures";
 
 interface Particle {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   life: number;
+  uvOffset: [number, number]; // random sub-region within the block's face texture
 }
 
 interface ParticleEvent {
@@ -17,7 +18,9 @@ interface ParticleEvent {
 }
 
 const MAX_PARTICLES = 200;
-const PARTICLE_SIZE = 0.08;
+const PARTICLE_SIZE = 0.12;
+// Each particle shows a small fraction of the block texture
+const UV_FRAC = 0.25; // 1/4 of the face texture per particle
 
 export function useBlockParticles() {
   const particlesRef = useRef<ParticleEvent[]>([]);
@@ -33,10 +36,47 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
   const particles = useRef<Particle[]>([]);
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const colorArr = useMemo(() => new Float32Array(MAX_PARTICLES * 3).fill(1), []);
 
-  const geo = useMemo(() => new THREE.BoxGeometry(PARTICLE_SIZE, PARTICLE_SIZE, PARTICLE_SIZE), []);
-  const mat = useMemo(() => new THREE.MeshLambertMaterial({ vertexColors: false }), []);
+  // We create a PlaneGeometry for each particle; UVs will be set per-instance via a custom attribute
+  const geo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(PARTICLE_SIZE, PARTICLE_SIZE);
+    // Add custom UV offset/scale attributes for instancing
+    const count = MAX_PARTICLES;
+    const uvOffsets = new Float32Array(count * 2);
+    const uvScales = new Float32Array(count * 2);
+    const uvBase = new Float32Array(count * 4); // u0, u1, v0, v1 per instance
+    g.setAttribute('uvOffset', new THREE.InstancedBufferAttribute(uvOffsets, 2));
+    g.setAttribute('uvScale', new THREE.InstancedBufferAttribute(uvScales, 2));
+    return g;
+  }, []);
+
+  // Store per-particle UV data
+  const uvData = useRef<{ u0: number; u1: number; v0: number; v1: number; su: number; sv: number }[]>([]);
+
+  const mat = useMemo(() => {
+    const atlas = getBlockAtlasTexture();
+    const m = new THREE.MeshLambertMaterial({
+      map: atlas,
+      transparent: true,
+      alphaTest: 0.1,
+    });
+
+    // Override UV in the shader to pick a sub-region of the atlas per instance
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+attribute vec2 uvOffset;
+attribute vec2 uvScale;`
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <uv_vertex>',
+        `#include <uv_vertex>
+vMapUv = uvOffset + vMapUv * uvScale;`
+      );
+    };
+    return m;
+  }, []);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -44,8 +84,18 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
     // Consume events
     while (eventsRef.current.length > 0) {
       const ev = eventsRef.current.pop()!;
-      const color = new THREE.Color(BLOCK_THREE_COLORS[ev.blockType] ?? 0x888888);
+      // Use the side face (row 1) for particles, like Minecraft
+      const [u0, u1, v0, v1] = getBlockUV(ev.blockType, 1);
+      const fullU = u1 - u0;
+      const fullV = v1 - v0;
+      const subU = fullU * UV_FRAC;
+      const subV = fullV * UV_FRAC;
+
       for (let i = 0; i < 12; i++) {
+        // Random sub-region within the face
+        const su = u0 + Math.random() * (fullU - subU);
+        const sv = v0 + Math.random() * (fullV - subV);
+
         const p: Particle = {
           pos: new THREE.Vector3(
             ev.x + 0.5 + (Math.random() - 0.5) * 0.8,
@@ -58,20 +108,16 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
             (Math.random() - 0.5) * 3,
           ),
           life: 0.6 + Math.random() * 0.4,
+          uvOffset: [su, sv],
         };
+
         if (particles.current.length < MAX_PARTICLES) {
           particles.current.push(p);
-          const idx = particles.current.length - 1;
-          colorArr[idx * 3] = color.r;
-          colorArr[idx * 3 + 1] = color.g;
-          colorArr[idx * 3 + 2] = color.b;
+          uvData.current.push({ u0: su, u1: su + subU, v0: sv, v1: sv + subV, su: subU, sv: subV });
         } else {
-          // Replace oldest
           const idx = Math.floor(Math.random() * MAX_PARTICLES);
           particles.current[idx] = p;
-          colorArr[idx * 3] = color.r;
-          colorArr[idx * 3 + 1] = color.g;
-          colorArr[idx * 3 + 2] = color.b;
+          uvData.current[idx] = { u0: su, u1: su + subU, v0: sv, v1: sv + subV, su: subU, sv: subV };
         }
       }
     }
@@ -79,28 +125,36 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
     const mesh = meshRef.current;
     if (!mesh) return;
 
+    const uvOffsetAttr = geo.getAttribute('uvOffset') as THREE.InstancedBufferAttribute;
+    const uvScaleAttr = geo.getAttribute('uvScale') as THREE.InstancedBufferAttribute;
+
     // Update particles
-    let alive = 0;
     for (let i = particles.current.length - 1; i >= 0; i--) {
       const p = particles.current[i];
       p.life -= dt;
       if (p.life <= 0) {
         particles.current.splice(i, 1);
-        continue;
+        uvData.current.splice(i, 1);
       }
-      p.vel.y -= 12 * dt;
-      p.pos.addScaledVector(p.vel, dt);
     }
 
+    let alive = 0;
     for (let i = 0; i < MAX_PARTICLES; i++) {
       if (i < particles.current.length) {
         const p = particles.current[i];
+        const uv = uvData.current[i];
         dummy.position.copy(p.pos);
-        const s = p.life;
+        const s = Math.min(p.life * 1.5, 1);
         dummy.scale.set(s, s, s);
+        // Billboard: face camera (handled by lookAt in frame, but simpler: random rotation)
+        dummy.rotation.set(Math.random() * 0.1, Math.random() * 0.1, Math.random() * 6.28);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
-        mesh.setColorAt(i, new THREE.Color(colorArr[i * 3], colorArr[i * 3 + 1], colorArr[i * 3 + 2]));
+
+        // Set UV offset and scale for this instance
+        uvOffsetAttr.setXY(i, uv.u0, uv.v0);
+        uvScaleAttr.setXY(i, uv.su, uv.sv);
+
         alive++;
       } else {
         dummy.position.set(0, -100, 0);
@@ -109,8 +163,10 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
         mesh.setMatrixAt(i, dummy.matrix);
       }
     }
+
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    uvOffsetAttr.needsUpdate = true;
+    uvScaleAttr.needsUpdate = true;
     mesh.count = Math.max(alive, 1);
   });
 
