@@ -148,12 +148,6 @@ export function HotBar({ inventory, selectedIndex, onSelect }: HotBarProps) {
                 )}
               </>
             )}
-            <div className="mc-text" style={{
-              position: 'absolute', top: 1, left: 3,
-              fontSize: 6, color: 'rgba(255,255,255,0.35)', lineHeight: 1,
-            }}>
-              {i + 1}
-            </div>
           </div>
         );
       })}
