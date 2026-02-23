@@ -5,9 +5,10 @@ import * as THREE from "three";
 import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType } from "@/lib/terrain";
 import { VoxelChunk } from "./VoxelChunk";
 import { TouchJoystick } from "./TouchJoystick";
-import { HotBar, InventorySlot, createEmptyInventory, addToInventory, removeFromInventory } from "./HotBar";
+import { HotBar, InventorySlot, addToInventory, removeFromInventory } from "./HotBar";
 import { BlockParticles, useBlockParticles } from "./BlockParticles";
 import { DroppedItems, DroppedItem, createDroppedItem } from "./DroppedItems";
+import { InventoryScreen, createFullInventory, TOTAL_SLOTS } from "./InventoryScreen";
 
 // ─── Swept AABB collision helpers ─────────────────────────────────────────────
 
@@ -286,7 +287,8 @@ export function MinecraftGame() {
   const worldRef  = useRef<WorldData>(generateTerrain(20));
   const [worldVersion, setWorldVersion] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [inventory, setInventory] = useState<InventorySlot[]>(createEmptyInventory());
+  const [inventory, setInventory] = useState<InventorySlot[]>(createFullInventory());
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const moveRef   = useRef({ dx: 0, dz: 0 });
   const camRef    = useRef<CamState>({ yaw: 0, pitch: 0 });
   const camPosRef = useRef(new THREE.Vector3(2, 30, 2));
@@ -600,8 +602,15 @@ export function MinecraftGame() {
           </svg>
         </div>
       </div>
-
-      <HotBar inventory={inventory} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+      <HotBar inventory={inventory} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onOpenInventory={() => setInventoryOpen(true)} />
+      {inventoryOpen && (
+        <InventoryScreen
+          inventory={inventory}
+          onInventoryChange={setInventory}
+          onClose={() => setInventoryOpen(false)}
+          selectedHotbarIndex={selectedIndex}
+        />
+      )}
     </div>
   );
 }

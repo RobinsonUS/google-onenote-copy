@@ -111,9 +111,10 @@ interface HotBarProps {
   inventory: InventorySlot[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  onOpenInventory: () => void;
 }
 
-export function HotBar({ inventory, selectedIndex, onSelect }: HotBarProps) {
+export function HotBar({ inventory, selectedIndex, onSelect, onOpenInventory }: HotBarProps) {
   const slotSize = 48;
 
   return (
@@ -123,9 +124,12 @@ export function HotBar({ inventory, selectedIndex, onSelect }: HotBarProps) {
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 100,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
     }}>
     <div className="mc-hotbar">
-      {inventory.map((slot, i) => {
+      {inventory.slice(0, 9).map((slot, i) => {
         const isSelected = i === selectedIndex;
         return (
           <div
@@ -151,6 +155,27 @@ export function HotBar({ inventory, selectedIndex, onSelect }: HotBarProps) {
           </div>
         );
       })}
+    </div>
+    {/* Inventory open button */}
+    <div
+      className="mc-hotbar"
+      style={{ cursor: 'pointer' }}
+      onPointerDown={onOpenInventory}
+    >
+      <div
+        className="mc-slot"
+        style={{
+          width: slotSize, height: slotSize,
+          background: 'rgb(180, 180, 180)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 3 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ width: 6, height: 6, background: '#fff', borderRadius: 1 }} />
+          ))}
+        </div>
+      </div>
     </div>
     </div>
   );
