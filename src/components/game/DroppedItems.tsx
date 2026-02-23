@@ -11,6 +11,7 @@ export interface DroppedItem {
   velY: number;
   blockType: number;
   age: number;
+  count: number;
 }
 
 let nextId = 0;
@@ -23,11 +24,15 @@ export function createDroppedItem(x: number, y: number, z: number, blockType: nu
     velY: 3,
     blockType,
     age: 0,
+    count: 1,
   };
 }
 
 const ITEM_SIZE = 0.3;
 const PICKUP_RADIUS = 1.2;
+const MERGE_RADIUS = 1.0;
+const DESPAWN_TIME = 300; // 5 minutes
+const DESPAWN_DISTANCE = 20;
 
 // Build a BoxGeometry with proper atlas UVs for a given block type
 function makeItemGeo(blockType: number): THREE.BoxGeometry {
@@ -79,9 +84,37 @@ export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: Dro
     const playerPos = playerPosRef.current;
     const activeIds = new Set<number>();
 
+    // Merge nearby items of same type
+    for (let i = 0; i < items.length; i++) {
+      const a = items[i];
+      for (let j = items.length - 1; j > i; j--) {
+        const b = items[j];
+        if (a.blockType !== b.blockType) continue;
+        const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        if (dx * dx + dy * dy + dz * dz < MERGE_RADIUS * MERGE_RADIUS) {
+          a.count += b.count;
+          items.splice(j, 1);
+        }
+      }
+    }
+
     for (let i = items.length - 1; i >= 0; i--) {
       const item = items[i];
       item.age += dt;
+
+      // Despawn after 5 minutes
+      if (item.age > DESPAWN_TIME) {
+        items.splice(i, 1);
+        continue;
+      }
+
+      // Despawn if too far from player
+      const pdx = playerPos.x - item.x;
+      const pdz = playerPos.z - item.z;
+      if (pdx * pdx + pdz * pdz > DESPAWN_DISTANCE * DESPAWN_DISTANCE) {
+        items.splice(i, 1);
+        continue;
+      }
 
       // Gravity
       item.velY -= 15 * dt;
@@ -91,7 +124,6 @@ export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: Dro
       const groundKey = posKey(item.x, newY - 0.15, item.z);
       const blockBelow = worldRef.current.get(groundKey);
       if (blockBelow !== undefined && blockBelow !== 0 && blockBelow !== 6) {
-        // Land on top of the block
         item.y = Math.floor(newY - 0.15) + 1 + ITEM_SIZE / 2;
         item.velY = 0;
       } else {
@@ -106,11 +138,13 @@ export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: Dro
 
       // Pickup check
       const dx = playerPos.x - item.x;
-      const dy = (playerPos.y - 0.8) - item.y; // check against player center
+      const dy = (playerPos.y - 0.8) - item.y;
       const dz = playerPos.z - item.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (dist < PICKUP_RADIUS && item.age > 0.5) {
-        onPickup(item.blockType);
+        for (let c = 0; c < item.count; c++) {
+          onPickup(item.blockType);
+        }
         items.splice(i, 1);
         continue;
       }
