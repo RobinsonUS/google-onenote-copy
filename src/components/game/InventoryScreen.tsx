@@ -75,59 +75,44 @@ interface InventoryScreenProps {
 }
 
 export function InventoryScreen({ inventory, onInventoryChange, onClose, selectedHotbarIndex }: InventoryScreenProps) {
-  const [heldItem, setHeldItem] = useState<{ slot: InventorySlot; fromIndex: number } | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const slotSize = 44;
 
   const handleSlotClick = (index: number) => {
-    if (heldItem === null) {
-      // Pick up
-      const slot = inventory[index];
-      if (slot.blockType !== null && slot.count > 0) {
-        setHeldItem({ slot: { ...slot }, fromIndex: index });
-        const next = inventory.map(s => ({ ...s }));
-        next[index] = { blockType: null, count: 0 };
-        onInventoryChange(next);
-      }
+    if (selectedIndex === null) {
+      // Nothing selected: select this slot (even if empty)
+      setSelectedIndex(index);
+    } else if (selectedIndex === index) {
+      // Clicking the already selected slot: deselect
+      setSelectedIndex(null);
     } else {
-      // Place
+      // A different slot is selected: move/swap items
       const next = inventory.map(s => ({ ...s }));
+      const source = next[selectedIndex];
       const target = next[index];
-      if (target.blockType === null || target.count === 0) {
-        // Empty slot: place held item
-        next[index] = { ...heldItem.slot };
-        onInventoryChange(next);
-        setHeldItem(null);
-      } else if (target.blockType === heldItem.slot.blockType) {
-        // Same type: merge
-        next[index] = { blockType: target.blockType, count: target.count + heldItem.slot.count };
-        onInventoryChange(next);
-        setHeldItem(null);
-      } else {
-        // Swap
-        next[index] = { ...heldItem.slot };
-        setHeldItem({ slot: { ...target }, fromIndex: index });
-        onInventoryChange(next);
+
+      if (source.blockType === null && source.count === 0 && target.blockType === null && target.count === 0) {
+        // Both empty: just deselect
+        setSelectedIndex(null);
+        return;
       }
+
+      if (source.blockType !== null && source.count > 0 && target.blockType === source.blockType) {
+        // Same type: merge
+        next[index] = { blockType: target.blockType, count: target.count + source.count };
+        next[selectedIndex] = { blockType: null, count: 0 };
+      } else {
+        // Swap (works for empty targets, empty sources, or different types)
+        next[selectedIndex] = { ...target };
+        next[index] = { ...source };
+      }
+
+      onInventoryChange(next);
+      setSelectedIndex(null);
     }
   };
 
   const handleClose = () => {
-    // If holding an item, put it back
-    if (heldItem) {
-      const next = inventory.map(s => ({ ...s }));
-      // Find an empty slot or merge
-      const existing = next.find(s => s.blockType === heldItem.slot.blockType && s.count > 0);
-      if (existing) {
-        existing.count += heldItem.slot.count;
-      } else {
-        const empty = next.find(s => s.blockType === null || s.count === 0);
-        if (empty) {
-          empty.blockType = heldItem.slot.blockType;
-          empty.count = heldItem.slot.count;
-        }
-      }
-      onInventoryChange(next);
-    }
     onClose();
   };
 
@@ -140,7 +125,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         className={`mc-slot ${isSelectedHotbar ? 'mc-slot-selected' : ''}`}
         style={{
           width: slotSize, height: slotSize, cursor: 'pointer', flexShrink: 0,
-          outline: heldItem?.fromIndex === index ? '2px solid rgba(255,255,255,0.5)' : 'none',
+          outline: selectedIndex === index ? '2px solid rgba(255,255,255,0.7)' : 'none',
         }}
         onPointerDown={() => handleSlotClick(index)}
       >
@@ -210,14 +195,6 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
           {Array.from({ length: HOTBAR_SIZE }, (_, i) => renderSlot(i, true))}
         </div>
 
-        {/* Held item indicator */}
-        {heldItem && (
-          <div className="mc-text" style={{
-            textAlign: 'center', fontSize: 7, color: '#404040', marginTop: 4,
-          }}>
-            {BLOCK_NAMES[heldItem.slot.blockType!] || 'Bloc'} x{heldItem.slot.count} sélectionné
-          </div>
-        )}
       </div>
     </div>
   );
