@@ -1,0 +1,141 @@
+import { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+import { getBlockAtlasTexture, getBlockUV } from "@/lib/textures";
+
+export interface DroppedItem {
+  id: number;
+  x: number;
+  y: number;
+  z: number;
+  velY: number;
+  blockType: number;
+  age: number;
+}
+
+let nextId = 0;
+export function createDroppedItem(x: number, y: number, z: number, blockType: number): DroppedItem {
+  return {
+    id: nextId++,
+    x: x + 0.5,
+    y: y + 0.8,
+    z: z + 0.5,
+    velY: 3,
+    blockType,
+    age: 0,
+  };
+}
+
+const ITEM_SIZE = 0.3;
+const PICKUP_RADIUS = 1.2;
+
+// Build a BoxGeometry with proper atlas UVs for a given block type
+function makeItemGeo(blockType: number): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE);
+  const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute;
+  const faceRows: (0 | 1 | 2)[] = [1, 1, 0, 2, 1, 1];
+  for (let face = 0; face < 6; face++) {
+    const [u0, u1, v0, v1] = getBlockUV(blockType, faceRows[face]);
+    const base = face * 4;
+    uvAttr.setXY(base + 0, u0, v1);
+    uvAttr.setXY(base + 1, u1, v1);
+    uvAttr.setXY(base + 2, u0, v0);
+    uvAttr.setXY(base + 3, u1, v0);
+  }
+  uvAttr.needsUpdate = true;
+  return geo;
+}
+
+interface DroppedItemsProps {
+  itemsRef: React.MutableRefObject<DroppedItem[]>;
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  onPickup: (blockType: number) => void;
+  worldRef: React.MutableRefObject<Map<string, number>>;
+}
+
+export function DroppedItems({ itemsRef, playerPosRef, onPickup, worldRef }: DroppedItemsProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const meshesRef = useRef<Map<number, THREE.Mesh>>(new Map());
+  const geoCache = useRef<Map<number, THREE.BoxGeometry>>(new Map());
+  
+  const atlas = useMemo(() => getBlockAtlasTexture(), []);
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ map: atlas, roughness: 1, metalness: 0 }), [atlas]);
+
+  const getGeo = (blockType: number) => {
+    if (!geoCache.current.has(blockType)) {
+      geoCache.current.set(blockType, makeItemGeo(blockType));
+    }
+    return geoCache.current.get(blockType)!;
+  };
+
+  const posKey = (x: number, y: number, z: number) => `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    const group = groupRef.current;
+    if (!group) return;
+
+    const items = itemsRef.current;
+    const playerPos = playerPosRef.current;
+    const activeIds = new Set<number>();
+
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      item.age += dt;
+
+      // Gravity
+      item.velY -= 15 * dt;
+      const newY = item.y + item.velY * dt;
+
+      // Simple ground collision: check block below
+      const groundKey = posKey(item.x, newY - 0.15, item.z);
+      const blockBelow = worldRef.current.get(groundKey);
+      if (blockBelow !== undefined && blockBelow !== 0 && blockBelow !== 6) {
+        // Land on top of the block
+        item.y = Math.floor(newY - 0.15) + 1 + ITEM_SIZE / 2;
+        item.velY = 0;
+      } else {
+        item.y = newY;
+      }
+
+      // Remove if fallen too far
+      if (item.y < -20) {
+        items.splice(i, 1);
+        continue;
+      }
+
+      // Pickup check
+      const dx = playerPos.x - item.x;
+      const dy = (playerPos.y - 0.8) - item.y; // check against player center
+      const dz = playerPos.z - item.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < PICKUP_RADIUS && item.age > 0.5) {
+        onPickup(item.blockType);
+        items.splice(i, 1);
+        continue;
+      }
+
+      activeIds.add(item.id);
+
+      // Create or update mesh
+      let mesh = meshesRef.current.get(item.id);
+      if (!mesh) {
+        mesh = new THREE.Mesh(getGeo(item.blockType), mat);
+        meshesRef.current.set(item.id, mesh);
+        group.add(mesh);
+      }
+      mesh.position.set(item.x, item.y + Math.sin(item.age * 2) * 0.08, item.z);
+      mesh.rotation.y = item.age * 1.5;
+    }
+
+    // Remove old meshes
+    for (const [id, mesh] of meshesRef.current) {
+      if (!activeIds.has(id)) {
+        group.remove(mesh);
+        meshesRef.current.delete(id);
+      }
+    }
+  });
+
+  return <group ref={groupRef} />;
+}
