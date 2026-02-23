@@ -5,8 +5,9 @@ import * as THREE from "three";
 import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType } from "@/lib/terrain";
 import { VoxelChunk } from "./VoxelChunk";
 import { TouchJoystick } from "./TouchJoystick";
-import { HotBar, HOTBAR_BLOCKS } from "./HotBar";
+import { HotBar, InventorySlot, createEmptyInventory, addToInventory, removeFromInventory } from "./HotBar";
 import { BlockParticles, useBlockParticles } from "./BlockParticles";
+import { DroppedItems, DroppedItem, createDroppedItem } from "./DroppedItems";
 
 // ─── Swept AABB collision helpers ─────────────────────────────────────────────
 
@@ -20,7 +21,6 @@ function isSolid(world: WorldData, x: number, y: number, z: number): boolean {
   return bt !== undefined && bt !== BLOCK_TYPES.AIR && bt !== BLOCK_TYPES.WATER;
 }
 
-// Check if AABB at given position overlaps any solid block
 function aabbOverlaps(px: number, feetY: number, pz: number, world: WorldData): boolean {
   const x0 = Math.floor(px - HALF);
   const x1 = Math.floor(px + HALF);
@@ -35,11 +35,8 @@ function aabbOverlaps(px: number, feetY: number, pz: number, world: WorldData): 
   return false;
 }
 
-// Resolve Y axis: find the highest ground below feet or push out if inside block
-// Check if feet are supported (solid block directly below any corner)
 function isOnGround(px: number, feetY: number, pz: number, world: WorldData): boolean {
   const by = Math.floor(feetY - 0.001);
-  // Check if feetY is near the top of a block and that block is solid
   const topOfBlock = by + 1;
   if (Math.abs(feetY - topOfBlock) > 0.01) return false;
   return (
@@ -51,7 +48,6 @@ function isOnGround(px: number, feetY: number, pz: number, world: WorldData): bo
 }
 
 function moveY(px: number, feetY: number, pz: number, dy: number, velY: number, world: WorldData): { feetY: number; velY: number; onGround: boolean } {
-  // If already on ground and not jumping, stay put
   if (dy <= 0 && isOnGround(px, feetY, pz, world) && velY <= 0) {
     return { feetY, velY: 0, onGround: true };
   }
@@ -60,7 +56,6 @@ function moveY(px: number, feetY: number, pz: number, dy: number, velY: number, 
   
   if (!aabbOverlaps(px, newFeetY, pz, world)) {
     if (dy <= 0) {
-      // Check if we passed through a block top (snap landing)
       const startBlock = Math.floor(feetY);
       const endBlock = Math.floor(newFeetY);
       for (let by = startBlock; by >= endBlock; by--) {
@@ -83,7 +78,6 @@ function moveY(px: number, feetY: number, pz: number, dy: number, velY: number, 
     return { feetY: newFeetY, velY, onGround: false };
   }
   
-  // Collision — binary search for exact contact point with more iterations for precision
   let lo = 0, hi = Math.abs(dy);
   const sign = dy > 0 ? 1 : -1;
   for (let i = 0; i < 10; i++) {
@@ -97,14 +91,12 @@ function moveY(px: number, feetY: number, pz: number, dy: number, velY: number, 
   const safeFeetY = feetY + sign * lo;
   
   if (dy <= 0) {
-    // Snap to integer block top for stability
     const snapped = Math.ceil(safeFeetY - 0.001);
     if (!aabbOverlaps(px, snapped, pz, world)) {
       return { feetY: snapped, velY: 0, onGround: true };
     }
     return { feetY: safeFeetY, velY: 0, onGround: true };
   } else {
-    // Head hit ceiling — zero velocity immediately
     return { feetY: safeFeetY, velY: 0, onGround: false };
   }
 }
@@ -129,7 +121,6 @@ function CameraController({
   const posRef   = useRef(new THREE.Vector3(0, 40, 0));
   const velY     = useRef(0);
   const onGround = useRef(false);
-  // Pre-allocated vectors to avoid GC pressure
   const _lookDir = useRef(new THREE.Vector3());
   const _lookTarget = useRef(new THREE.Vector3());
 
@@ -152,7 +143,6 @@ function CameraController({
 
     const sinYaw = Math.sin(yaw);
     const cosYaw = Math.cos(yaw);
-    // Compute move direction inline (no Vector3 allocation)
     let moveX = -dz * sinYaw + dx * cosYaw;
     let moveZ = -dz * cosYaw + dx * -sinYaw;
     const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
@@ -160,8 +150,6 @@ function CameraController({
 
     const pos = posRef.current;
 
-    // Apply gravity FIRST so XZ collision checks use the correct Y
-    // Clamp dt to avoid large velocity spikes after lag frames
     velY.current = Math.max(velY.current - 28 * dt, -20);
     const gravDy = velY.current * dt;
     let feetY = pos.y - EYE;
@@ -170,13 +158,11 @@ function CameraController({
     velY.current = resolved.velY;
     onGround.current = resolved.onGround;
 
-    // Move X (at resolved Y)
     const newX = pos.x + moveX * speed * dt;
     if (!aabbOverlaps(newX, feetY, pos.z, world)) {
       pos.x = newX;
     }
 
-    // Move Z (at resolved Y)
     const newZ = pos.z + moveZ * speed * dt;
     if (!aabbOverlaps(pos.x, feetY, newZ, world)) {
       pos.z = newZ;
@@ -198,11 +184,15 @@ function CameraController({
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-function Scene({ world, worldVersion, onBlockClick, particleEventsRef }: {
+function Scene({ world, worldVersion, onBlockClick, particleEventsRef, droppedItemsRef, playerPosRef, onPickup, worldRef }: {
   world: WorldData;
   worldVersion: number;
   onBlockClick: (x:number,y:number,z:number,normal:THREE.Vector3) => void;
   particleEventsRef: React.MutableRefObject<Array<{x:number;y:number;z:number;blockType:number}>>;
+  droppedItemsRef: React.MutableRefObject<DroppedItem[]>;
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  onPickup: (blockType: number) => void;
+  worldRef: React.MutableRefObject<WorldData>;
 }) {
   return (
     <>
@@ -211,6 +201,7 @@ function Scene({ world, worldVersion, onBlockClick, particleEventsRef }: {
       <directionalLight position={[30, 50, 20]} intensity={0.9} castShadow={false} />
       <VoxelChunk world={world} version={worldVersion} onBlockClick={onBlockClick} />
       <BlockParticles eventsRef={particleEventsRef} />
+      <DroppedItems itemsRef={droppedItemsRef} playerPosRef={playerPosRef} onPickup={onPickup} worldRef={worldRef} />
     </>
   );
 }
@@ -295,10 +286,12 @@ export function MinecraftGame() {
   const worldRef  = useRef<WorldData>(generateTerrain(20));
   const [worldVersion, setWorldVersion] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [inventory, setInventory] = useState<InventorySlot[]>(createEmptyInventory());
   const moveRef   = useRef({ dx: 0, dz: 0 });
   const camRef    = useRef<CamState>({ yaw: 0, pitch: 0 });
   const camPosRef = useRef(new THREE.Vector3(2, 30, 2));
   const cameraRef = useRef<THREE.Camera | null>(null);
+  const droppedItemsRef = useRef<DroppedItem[]>([]);
 
   // Particles
   const { particlesRef: particleEventsRef, emit: emitParticles } = useBlockParticles();
@@ -316,19 +309,22 @@ export function MinecraftGame() {
   const isHoldingRef  = useRef(false);
   const holdTouchPosRef = useRef({ x: 0, y: 0 });
   const hasFirstBrokenRef = useRef(false);
-  
 
   const onCamPos = useCallback((pos: THREE.Vector3) => {
     camPosRef.current.copy(pos);
   }, []);
 
-  // Mutate world directly, bump version to trigger mesh rebuild
   const mutateWorld = useCallback((fn: (w: WorldData) => void) => {
     fn(worldRef.current);
     setWorldVersion(v => v + 1);
   }, []);
 
-  // Break block with particles
+  // Pickup handler
+  const onPickup = useCallback((blockType: number) => {
+    setInventory(inv => addToInventory(inv, blockType));
+  }, []);
+
+  // Break block: emit particles, drop item, remove block
   const breakBlock = useCallback((screenX?: number, screenY?: number) => {
     let result: ReturnType<typeof screenRaycast> = null;
     if (screenX !== undefined && screenY !== undefined && cameraRef.current) {
@@ -338,14 +334,20 @@ export function MinecraftGame() {
     }
     if (result?.hit) {
       emitParticles(result.x, result.y, result.z, result.blockType);
+      // Drop item
+      droppedItemsRef.current.push(createDroppedItem(result.x, result.y, result.z, result.blockType));
       mutateWorld(w => w.delete(posKey(result.x, result.y, result.z)));
     }
   }, [emitParticles, mutateWorld]);
 
-  // Place block
+  // Place block: use inventory
+  const inventoryRef = useRef(inventory);
+  inventoryRef.current = inventory;
+
   const placeBlock = useCallback((screenX?: number, screenY?: number) => {
-    const selectedBlock = HOTBAR_BLOCKS[selectedIndex];
-    if (!selectedBlock) return;
+    const slot = inventoryRef.current[selectedIndex];
+    if (!slot || slot.blockType === null || slot.count <= 0) return;
+    const selectedBlock = slot.blockType;
 
     let result: ReturnType<typeof screenRaycast> = null;
     if (screenX !== undefined && screenY !== undefined && cameraRef.current) {
@@ -360,6 +362,7 @@ export function MinecraftGame() {
       const key = posKey(placeX, placeY, placeZ);
       if (!worldRef.current.has(key)) {
         mutateWorld(w => w.set(key, selectedBlock as BlockType));
+        setInventory(inv => removeFromInventory(inv, selectedIndex));
       }
     }
   }, [selectedIndex, mutateWorld]);
@@ -393,7 +396,6 @@ export function MinecraftGame() {
         holdTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
         isHoldingRef.current = true;
 
-        // 1s delay before first break, then continuous 300ms
         hasFirstBrokenRef.current = false;
         clearBreakInterval();
         breakDelayRef.current = setTimeout(() => {
@@ -410,10 +412,8 @@ export function MinecraftGame() {
     }
   }, [breakBlock, clearBreakInterval]);
 
-  // Reset the 1s delay when camera moves (before first break)
   const resetBreakDelay = useCallback(() => {
     if (!isHoldingRef.current || hasFirstBrokenRef.current) return;
-    // Cancel current delay and restart it
     if (breakDelayRef.current) {
       clearTimeout(breakDelayRef.current);
       breakDelayRef.current = setTimeout(() => {
@@ -441,7 +441,6 @@ export function MinecraftGame() {
         camRef.current.pitch = Math.max(-1.4, Math.min(1.4,
           lookTouchRef.current.startPitch + dy * -0.005
         ));
-        // Reset 1s delay if camera moved before first break
         resetBreakDelay();
       }
     }
@@ -458,7 +457,6 @@ export function MinecraftGame() {
         const dx = touch.clientX - lookTouchRef.current.startX;
         const dy = touch.clientY - lookTouchRef.current.startY;
         const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
-        // Quick tap = place block
         if (!moved && elapsed < 300) {
           placeBlock(lookTouchRef.current.startX, lookTouchRef.current.startY);
         }
@@ -475,6 +473,13 @@ export function MinecraftGame() {
       else keys.delete(e.code);
       if (e.code === 'Space' && e.type === 'keydown') {
         window.dispatchEvent(new CustomEvent('mc-jump'));
+      }
+      // Number keys for slot selection
+      if (e.type === 'keydown') {
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= 9) {
+          setSelectedIndex(num - 1);
+        }
       }
     };
 
@@ -529,7 +534,6 @@ export function MinecraftGame() {
 
   const handleJoystickMove = useCallback((state: { dx: number; dz: number }) => {
     moveRef.current = state;
-    // Reset 1s break delay if player starts moving before first break
     if (state.dx !== 0 || state.dz !== 0) {
       resetBreakDelay();
     }
@@ -565,6 +569,10 @@ export function MinecraftGame() {
             worldVersion={worldVersion}
             onBlockClick={() => {}}
             particleEventsRef={particleEventsRef}
+            droppedItemsRef={droppedItemsRef}
+            playerPosRef={camPosRef}
+            onPickup={onPickup}
+            worldRef={worldRef}
           />
         </Canvas>
       </div>
@@ -593,7 +601,7 @@ export function MinecraftGame() {
         </div>
       </div>
 
-      <HotBar selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+      <HotBar inventory={inventory} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
     </div>
   );
 }
