@@ -29,7 +29,7 @@ export function createDroppedItem(x: number, y: number, z: number, blockType: nu
 }
 
 const ITEM_SIZE = 0.3;
-const PICKUP_RADIUS = 1.2;
+const PICKUP_RADIUS = 2.0;
 const MERGE_RADIUS = 2.0;
 const DESPAWN_TIME = 300; // 5 minutes
 const DESPAWN_DISTANCE = 20;
