@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* Definition of the design system - Minecraft Theme */
+
+@layer base {
+  :root {
+    --background: 120 20% 8%;
+    --foreground: 60 100% 95%;
+
+    --card: 120 15% 12%;
+    --card-foreground: 60 100% 90%;
+
+    --popover: 120 15% 12%;
+    --popover-foreground: 60 100% 90%;
+
+    --primary: 120 50% 35%;
+    --primary-foreground: 60 100% 95%;
+
+    --secondary: 30 40% 25%;
+    --secondary-foreground: 60 100% 90%;
+
+    --muted: 120 10% 20%;
+    --muted-foreground: 120 10% 60%;
+
+    --accent: 45 80% 45%;
+    --accent-foreground: 120 20% 8%;
+
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 60 100% 95%;
+
+    --border: 120 15% 20%;
+    --input: 120 15% 15%;
+    --ring: 120 50% 35%;
+
+    --radius: 0rem;
+
+    --sidebar-background: 120 15% 10%;
+    --sidebar-foreground: 60 100% 90%;
+    --sidebar-primary: 120 50% 35%;
+    --sidebar-primary-foreground: 60 100% 95%;
+    --sidebar-accent: 120 15% 18%;
+    --sidebar-accent-foreground: 60 100% 90%;
+    --sidebar-border: 120 15% 20%;
+    --sidebar-ring: 120 50% 35%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Press Start 2P', monospace;
+    image-rendering: pixelated;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
+/* Minecraft UI styles */
+.mc-text {
+  font-family: 'Press Start 2P', monospace;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8);
+}
+
+.mc-panel {
+  background: rgba(0, 0, 0, 0.75);
+  border: 3px solid #555;
+  border-right-color: #222;
+  border-bottom-color: #222;
+}
+
+.mc-slot {
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid #666;
+  border-right-color: #222;
+  border-bottom-color: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.mc-slot-selected {
+  border: 3px solid #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.mc-btn {
+  background: hsl(var(--secondary));
+  border: 3px solid #888;
+  border-right-color: #333;
+  border-bottom-color: #333;
+  font-family: 'Press Start 2P', monospace;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+  cursor: pointer;
+  color: #fff;
+  padding: 8px 16px;
+  font-size: 10px;
+  transition: filter 0.1s;
+  user-select: none;
+}
+
+.mc-btn:active {
+  filter: brightness(0.8);
+  transform: translateY(1px);
+}
+
+.joystick-base {
+  background: rgba(255, 255, 255, 0.12);
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  touch-action: none;
+}
+
+.joystick-thumb {
+  background: rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  transition: none;
+}
+
+canvas {
+  touch-action: none;
+}
