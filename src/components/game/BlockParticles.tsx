@@ -7,7 +7,8 @@ interface Particle {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   life: number;
-  uvOffset: [number, number]; // random sub-region within the block's face texture
+  uvOffset: [number, number];
+  rot: number; // fixed rotation per particle
 }
 
 interface ParticleEvent {
@@ -109,6 +110,7 @@ vMapUv = uvOffset + vMapUv * uvScale;`
           ),
           life: 0.6 + Math.random() * 0.4,
           uvOffset: [su, sv],
+          rot: Math.random() * Math.PI * 2,
         };
 
         if (particles.current.length < MAX_PARTICLES) {
@@ -128,14 +130,17 @@ vMapUv = uvOffset + vMapUv * uvScale;`
     const uvOffsetAttr = geo.getAttribute('uvOffset') as THREE.InstancedBufferAttribute;
     const uvScaleAttr = geo.getAttribute('uvScale') as THREE.InstancedBufferAttribute;
 
-    // Update particles
+    // Update particles physics
     for (let i = particles.current.length - 1; i >= 0; i--) {
       const p = particles.current[i];
       p.life -= dt;
       if (p.life <= 0) {
         particles.current.splice(i, 1);
         uvData.current.splice(i, 1);
+        continue;
       }
+      p.vel.y -= 12 * dt; // gravity
+      p.pos.addScaledVector(p.vel, dt);
     }
 
     let alive = 0;
@@ -144,10 +149,9 @@ vMapUv = uvOffset + vMapUv * uvScale;`
         const p = particles.current[i];
         const uv = uvData.current[i];
         dummy.position.copy(p.pos);
-        const s = Math.min(p.life * 1.5, 1);
+        const s = p.life;
         dummy.scale.set(s, s, s);
-        // Billboard: face camera (handled by lookAt in frame, but simpler: random rotation)
-        dummy.rotation.set(Math.random() * 0.1, Math.random() * 0.1, Math.random() * 6.28);
+        dummy.rotation.set(0, 0, p.rot);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
 
