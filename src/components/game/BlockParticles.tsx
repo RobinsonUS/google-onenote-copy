@@ -40,7 +40,7 @@ export function BlockParticles({ eventsRef }: { eventsRef: React.MutableRefObjec
 
   // We create a PlaneGeometry for each particle; UVs will be set per-instance via a custom attribute
   const geo = useMemo(() => {
-    const g = new THREE.PlaneGeometry(PARTICLE_SIZE, PARTICLE_SIZE);
+    const g = new THREE.BoxGeometry(PARTICLE_SIZE, PARTICLE_SIZE, PARTICLE_SIZE);
     // Add custom UV offset/scale attributes for instancing
     const count = MAX_PARTICLES;
     const uvOffsets = new Float32Array(count * 2);
