@@ -80,31 +80,26 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
 
   const handleSlotClick = (index: number) => {
     if (selectedIndex === null) {
-      // Nothing selected: select this slot (even if empty)
       setSelectedIndex(index);
     } else if (selectedIndex === index) {
-      // Clicking the already selected slot: deselect
       setSelectedIndex(null);
     } else {
-      // A different slot is selected: move/swap items
-      const next = inventory.map(s => ({ ...s }));
-      const source = next[selectedIndex];
-      const target = next[index];
+      const source = inventory[selectedIndex];
+      const target = inventory[index];
+      const bothEmpty = (source.blockType === null || source.count === 0) && (target.blockType === null || target.count === 0);
 
-      if (source.blockType === null && source.count === 0 && target.blockType === null && target.count === 0) {
-        // Both empty: just deselect
+      if (bothEmpty) {
         setSelectedIndex(null);
         return;
       }
 
+      const next = inventory.map(s => ({ ...s }));
       if (source.blockType !== null && source.count > 0 && target.blockType === source.blockType) {
-        // Same type: merge
-        next[index] = { blockType: target.blockType, count: target.count + source.count };
+        next[index] = { blockType: target.blockType!, count: target.count + source.count };
         next[selectedIndex] = { blockType: null, count: 0 };
       } else {
-        // Swap (works for empty targets, empty sources, or different types)
-        next[selectedIndex] = { ...target };
-        next[index] = { ...source };
+        next[selectedIndex] = { blockType: target.blockType, count: target.count };
+        next[index] = { blockType: source.blockType, count: source.count };
       }
 
       onInventoryChange(next);
