@@ -118,7 +118,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
 
   const renderSlot = (index: number, isHotbar: boolean = false) => {
     const slot = inventory[index];
-    const isSelectedHotbar = isHotbar && (index === selectedHotbarIndex);
+    const isSelectedHotbar = false;
     return (
       <div
         key={index}
