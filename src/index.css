@@ -83,7 +83,7 @@
 }
 
 .mc-hotbar {
-  background: rgba(139, 139, 139, 0.75);
+  background: #c6c6c6;
   border: 3px solid;
   border-color: rgba(85,85,85,0.75) rgba(34,34,34,0.75) rgba(34,34,34,0.75) rgba(85,85,85,0.75);
   padding: 2px;
@@ -92,7 +92,7 @@
 }
 
 .mc-slot {
-  background: rgb(100, 100, 100);
+  background: #8b8b8b;
   border: 2px solid;
   border-color: #222 #555 #555 #222;
   display: flex;
