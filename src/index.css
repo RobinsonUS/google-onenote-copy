@@ -83,7 +83,7 @@
 }
 
 .mc-hotbar {
-  background: #c6c6c6;
+  background: rgba(198, 198, 198, 0.5);
   border: 3px solid;
   border-color: rgba(85,85,85,0.75) rgba(34,34,34,0.75) rgba(34,34,34,0.75) rgba(85,85,85,0.75);
   padding: 2px;
