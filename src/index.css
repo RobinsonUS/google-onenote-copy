@@ -92,7 +92,7 @@
 }
 
 .mc-slot {
-  background: rgb(55, 55, 55);
+  background: rgb(100, 100, 100);
   border: 2px solid;
   border-color: #222 #555 #555 #222;
   display: flex;
