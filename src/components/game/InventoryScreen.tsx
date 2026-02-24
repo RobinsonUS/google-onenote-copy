@@ -86,9 +86,10 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     } else {
       const source = inventory[selectedIndex];
       const target = inventory[index];
-      const bothEmpty = (source.blockType === null || source.count === 0) && (target.blockType === null || target.count === 0);
+      const sourceEmpty = source.blockType === null || source.count <= 0;
+      const targetEmpty = target.blockType === null || target.count <= 0;
 
-      if (bothEmpty) {
+      if (sourceEmpty && targetEmpty) {
         setSelectedIndex(null);
         return;
       }
@@ -151,7 +152,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       onPointerDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div style={{
-        background: 'rgb(198, 198, 198)',
+        background: '#c6c6c6',
         border: '4px solid',
         borderColor: '#fff #555 #555 #fff',
         padding: 12,
