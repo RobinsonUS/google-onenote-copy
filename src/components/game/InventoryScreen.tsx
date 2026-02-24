@@ -55,7 +55,7 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
       ref={canvasRef}
       width={ICON_PX}
       height={ICON_PX}
-      style={{ imageRendering: 'auto', display: 'block', width: 28, height: 28, filter: 'saturate(1.45) brightness(1.1)' }}
+      style={{ imageRendering: 'auto', display: 'block', width: 24, height: 24, filter: 'saturate(1.45) brightness(1.1)' }}
     />
   );
 }
@@ -76,7 +76,7 @@ interface InventoryScreenProps {
 
 export function InventoryScreen({ inventory, onInventoryChange, onClose, selectedHotbarIndex }: InventoryScreenProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const slotSize = 44;
+  const slotSize = 40;
 
   const handleSlotClick = (index: number) => {
     if (selectedIndex === null) {
@@ -156,7 +156,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         border: '4px solid',
         borderColor: '#fff #555 #555 #fff',
         padding: 12,
-        display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 2,
       }}>
         {/* Crafting area */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -173,7 +173,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         </div>
 
         {/* Separator */}
-        <div style={{ height: 2, background: '#888', margin: '4px 0' }} />
+        <div style={{ height: 2, background: '#888', margin: '6px 0 2px' }} />
 
         {/* Storage (3 rows of 9) */}
         {[0, 1, 2].map(row => (
