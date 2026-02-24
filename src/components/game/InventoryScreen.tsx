@@ -122,10 +122,9 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     return (
       <div
         key={index}
-        className={`mc-slot ${isSelectedHotbar ? 'mc-slot-selected' : ''}`}
+        className={`mc-slot ${selectedIndex === index ? 'mc-slot-selected' : ''}`}
         style={{
           width: slotSize, height: slotSize, cursor: 'pointer', flexShrink: 0,
-          outline: selectedIndex === index ? '2px solid rgba(255,255,255,0.7)' : 'none',
         }}
         onPointerDown={() => handleSlotClick(index)}
       >
