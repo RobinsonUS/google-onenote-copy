@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { InventorySlot, HOTBAR_SIZE, MAX_STACK } from "./HotBar";
 import { BLOCK_TYPES } from "@/lib/terrain";
 import { onAtlasUpdate } from "@/lib/textures";
@@ -37,6 +37,11 @@ interface InventoryScreenProps {
 
 export function InventoryScreen({ inventory, onInventoryChange, onClose, selectedHotbarIndex }: InventoryScreenProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [splitState, setSplitState] = useState<{ index: number; blockType: number; total: number; selected: number } | null>(null);
+  const [heldItems, setHeldItems] = useState<InventorySlot>({ blockType: null, count: 0 });
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartX = useRef(0);
+  const isSplitting = useRef(false);
   const [craftSlots, setCraftSlots] = useState<InventorySlot[]>([
     { blockType: null, count: 0 },
     { blockType: null, count: 0 },
@@ -44,6 +49,68 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     { blockType: null, count: 0 },
   ]);
   const slotSize = 48;
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleSplitPointerDown = (index: number, e: React.PointerEvent) => {
+    const slot = index >= TOTAL_SLOTS ? craftSlots[index - TOTAL_SLOTS] : inventory[index];
+    if (slot.blockType === null || slot.count <= 1) return;
+    if (selectedIndex !== null || heldItems.blockType !== null) return;
+
+    longPressStartX.current = e.clientX;
+    isSplitting.current = false;
+
+    longPressTimer.current = setTimeout(() => {
+      isSplitting.current = true;
+      const half = Math.ceil(slot.count / 2);
+      setSplitState({ index, blockType: slot.blockType!, total: slot.count, selected: half });
+    }, 400);
+  };
+
+  const handleSplitPointerMove = (e: React.PointerEvent) => {
+    if (!splitState) {
+      // If moving before long press triggers, cancel it
+      if (longPressTimer.current && Math.abs(e.clientX - longPressStartX.current) > 10) {
+        cancelLongPress();
+      }
+      return;
+    }
+    const dx = e.clientX - longPressStartX.current;
+    const range = 120; // pixels for full range
+    const ratio = Math.max(0, Math.min(1, 0.5 + dx / range));
+    const selected = Math.max(1, Math.min(splitState.total, Math.round(ratio * splitState.total)));
+    setSplitState(prev => prev ? { ...prev, selected } : null);
+  };
+
+  const handleSplitPointerUp = () => {
+    cancelLongPress();
+    if (splitState) {
+      // Pick up the selected portion, leave the rest
+      const { index, blockType, total, selected } = splitState;
+      const remaining = total - selected;
+      
+      if (index >= TOTAL_SLOTS) {
+        const ci = index - TOTAL_SLOTS;
+        const nextCraft = [...craftSlots];
+        nextCraft[ci] = remaining > 0 ? { blockType, count: remaining } : { blockType: null, count: 0 };
+        setCraftSlots(nextCraft);
+      } else {
+        const nextInv = inventory.map(s => ({ ...s }));
+        nextInv[index] = remaining > 0 ? { blockType, count: remaining } : { blockType: null, count: 0 };
+        onInventoryChange(nextInv);
+      }
+      setHeldItems({ blockType, count: selected });
+      setSelectedIndex(index);
+      setSplitState(null);
+      isSplitting.current = false;
+      return;
+    }
+  };
 
   // Compute crafting result: exactly 1 slot has wood → 4 planks
   const craftResult: InventorySlot = useMemo(() => {
@@ -173,50 +240,72 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
   };
 
   const handleSlotClick = (index: number) => {
+    if (isSplitting.current || splitState) return;
+    
     if (selectedIndex === null) {
+      const slot = inventory[index];
+      if (slot.blockType === null || slot.count <= 0) return;
       setSelectedIndex(index);
+      setHeldItems({ blockType: slot.blockType, count: slot.count });
     } else if (selectedIndex === index) {
+      // Put back held items
+      if (heldItems.blockType !== null && heldItems.count > 0) {
+        const nextInv = inventory.map(s => ({ ...s }));
+        const existing = nextInv[index];
+        if (existing.blockType === heldItems.blockType || existing.blockType === null) {
+          nextInv[index] = { blockType: heldItems.blockType, count: existing.count + heldItems.count };
+        }
+        onInventoryChange(nextInv);
+      }
       setSelectedIndex(null);
+      setHeldItems({ blockType: null, count: 0 });
     } else {
       // Source is a craft slot
       const isSourceCraft = selectedIndex >= TOTAL_SLOTS;
-      const isTargetCraft = false; // regular inventory slots handled here
       
       if (isSourceCraft) {
-        const sourceSlot = craftSlots[selectedIndex - TOTAL_SLOTS];
+        const sourceSlot = heldItems.blockType !== null ? heldItems : craftSlots[selectedIndex - TOTAL_SLOTS];
         const targetSlot = inventory[index];
         const sourceEmpty = sourceSlot.blockType === null || sourceSlot.count <= 0;
         const targetEmpty = targetSlot.blockType === null || targetSlot.count <= 0;
-        if (sourceEmpty && targetEmpty) { setSelectedIndex(null); return; }
+        if (sourceEmpty && targetEmpty) { setSelectedIndex(null); setHeldItems({ blockType: null, count: 0 }); return; }
 
         const nextInv = inventory.map(s => ({ ...s }));
-        const nextCraft = [...craftSlots];
         if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
           const total = targetSlot.count + sourceSlot.count;
           if (total <= MAX_STACK) {
             nextInv[index] = { blockType: targetSlot.blockType, count: total };
-            nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: null, count: 0 };
           } else {
             nextInv[index] = { blockType: targetSlot.blockType, count: MAX_STACK };
-            nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: sourceSlot.blockType, count: total - MAX_STACK };
+            // leftover goes back - but for simplicity just update craft slot
+            const ci = selectedIndex - TOTAL_SLOTS;
+            const nextCraft = [...craftSlots];
+            nextCraft[ci] = { blockType: sourceSlot.blockType, count: total - MAX_STACK };
+            setCraftSlots(nextCraft);
           }
         } else {
           nextInv[index] = { blockType: sourceSlot.blockType, count: sourceSlot.count };
-          nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: targetSlot.blockType, count: targetSlot.count };
+          if (!targetEmpty) {
+            const ci = selectedIndex - TOTAL_SLOTS;
+            const nextCraft = [...craftSlots];
+            nextCraft[ci] = { blockType: targetSlot.blockType, count: targetSlot.count };
+            setCraftSlots(nextCraft);
+          }
         }
         onInventoryChange(nextInv);
-        setCraftSlots(nextCraft);
         setSelectedIndex(null);
+        setHeldItems({ blockType: null, count: 0 });
         return;
       }
 
-      const source = inventory[selectedIndex];
+      const source = heldItems.blockType !== null ? heldItems : inventory[selectedIndex];
       const target = inventory[index];
       const sourceEmpty = source.blockType === null || source.count <= 0;
       const targetEmpty = target.blockType === null || target.count <= 0;
 
       if (sourceEmpty && targetEmpty) {
         setSelectedIndex(null);
+        setHeldItems({ blockType: null, count: 0 });
         return;
       }
 
@@ -237,11 +326,14 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
 
       onInventoryChange(next);
       setSelectedIndex(null);
+      setHeldItems({ blockType: null, count: 0 });
     }
   };
 
   const renderSlot = (index: number, isHotbar: boolean = false) => {
     const slot = inventory[index];
+    const isSplitTarget = splitState?.index === index;
+    const displayCount = isSplitTarget ? (slot.count - splitState.selected) : slot.count;
     return (
       <div
         key={index}
@@ -249,20 +341,54 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         style={{
           width: slotSize, height: slotSize, cursor: 'pointer', flexShrink: 0,
         }}
-        onPointerDown={() => handleSlotClick(index)}
+        onPointerDown={(e) => {
+          handleSplitPointerDown(index, e);
+        }}
+        onPointerMove={handleSplitPointerMove}
+        onPointerUp={() => {
+          if (!isSplitting.current && !splitState) {
+            cancelLongPress();
+            handleSlotClick(index);
+          } else {
+            handleSplitPointerUp();
+          }
+        }}
+        onPointerLeave={() => {
+          if (splitState) handleSplitPointerUp();
+        }}
       >
         {slot.blockType !== null && slot.count > 0 && (
           <>
             <SmallBlockIcon blockType={slot.blockType} />
-            {slot.count > 1 && (
+            {displayCount > 1 && (
               <div className="mc-text" style={{
                 position: 'absolute', bottom: 1, right: 3,
                 fontSize: 7, color: '#fff', lineHeight: 1,
               }}>
-                {slot.count}
+                {isSplitTarget ? displayCount : slot.count}
               </div>
             )}
           </>
+        )}
+        {isSplitTarget && (
+          <div style={{
+            position: 'absolute', bottom: -14, left: 0, right: 0,
+            height: 8, background: '#555', borderRadius: 2, overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${(splitState.selected / splitState.total) * 100}%`,
+              height: '100%', background: '#4caf50', borderRadius: 2,
+              transition: 'width 0.05s',
+            }} />
+          </div>
+        )}
+        {isSplitTarget && (
+          <div className="mc-text" style={{
+            position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+            fontSize: 8, color: '#4caf50', whiteSpace: 'nowrap',
+          }}>
+            {splitState.selected}/{splitState.total}
+          </div>
         )}
       </div>
     );
@@ -303,6 +429,8 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         touchAction: 'none',
       }}
+      onPointerMove={handleSplitPointerMove}
+      onPointerUp={() => { if (splitState) handleSplitPointerUp(); }}
       onPointerDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div style={{
