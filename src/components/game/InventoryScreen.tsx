@@ -88,7 +88,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
   const craftResult: InventorySlot = useMemo(() => {
     const filledSlots = craftSlots.filter(s => s.blockType !== null && s.count > 0);
     if (filledSlots.length === 1 && filledSlots[0].blockType === BLOCK_TYPES.WOOD) {
-      return { blockType: BLOCK_TYPES.PLANKS, count: filledSlots[0].count * 4 };
+      return { blockType: BLOCK_TYPES.PLANKS, count: 4 };
     }
     return { blockType: null, count: 0 };
   }, [craftSlots]);
@@ -114,8 +114,18 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       }
     }
     if (remaining > 0) return; // no space
-    // Clear craft slots
-    setCraftSlots(craftSlots.map(() => ({ blockType: null, count: 0 })));
+    // Consume only 1 input item from the craft slot
+    const nextCraft = craftSlots.map(s => ({ ...s }));
+    for (let i = 0; i < nextCraft.length; i++) {
+      if (nextCraft[i].blockType !== null && nextCraft[i].count > 0) {
+        nextCraft[i].count -= 1;
+        if (nextCraft[i].count <= 0) {
+          nextCraft[i] = { blockType: null, count: 0 };
+        }
+        break;
+      }
+    }
+    setCraftSlots(nextCraft);
     onInventoryChange(nextInv);
     setSelectedIndex(null);
   };
