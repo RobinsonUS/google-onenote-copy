@@ -9,6 +9,7 @@ export interface InventorySlot {
 }
 
 export const HOTBAR_SIZE = 9;
+export const MAX_STACK = 64;
 
 export function createEmptyInventory(): InventorySlot[] {
   return Array.from({ length: HOTBAR_SIZE }, () => ({ blockType: null, count: 0 }));
@@ -16,8 +17,8 @@ export function createEmptyInventory(): InventorySlot[] {
 
 export function addToInventory(inventory: InventorySlot[], blockType: number): InventorySlot[] {
   const next = inventory.map(s => ({ ...s }));
-  // Find existing stack
-  const existing = next.find(s => s.blockType === blockType && s.count > 0);
+  // Find existing stack with space
+  const existing = next.find(s => s.blockType === blockType && s.count > 0 && s.count < MAX_STACK);
   if (existing) {
     existing.count++;
     return next;
