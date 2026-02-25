@@ -39,6 +39,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [splitState, setSplitState] = useState<{ index: number; blockType: number; total: number; selected: number } | null>(null);
   const [heldItems, setHeldItems] = useState<InventorySlot>({ blockType: null, count: 0 });
+  const [isSplitPick, setIsSplitPick] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartX = useRef(0);
   const isSplitting = useRef(false);
@@ -105,6 +106,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         onInventoryChange(nextInv);
       }
       setHeldItems({ blockType, count: selected });
+      setIsSplitPick(true);
       setSelectedIndex(index);
       setSplitState(null);
       isSplitting.current = false;
@@ -247,6 +249,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       if (slot.blockType === null || slot.count <= 0) return;
       setSelectedIndex(index);
       setHeldItems({ blockType: slot.blockType, count: slot.count });
+      setIsSplitPick(false);
     } else if (selectedIndex === index) {
       // Put back held items
       if (heldItems.blockType !== null && heldItems.count > 0) {
@@ -310,14 +313,55 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       }
 
       const next = inventory.map(s => ({ ...s }));
+      const splitMove = isSplitPick;
+
       if (source.blockType !== null && source.count > 0 && target.blockType === source.blockType) {
         const total = target.count + source.count;
         if (total <= MAX_STACK) {
           next[index] = { blockType: target.blockType!, count: total };
-          next[selectedIndex] = { blockType: null, count: 0 };
+          if (!splitMove) {
+            next[selectedIndex] = { blockType: null, count: 0 };
+          }
         } else {
           next[index] = { blockType: target.blockType!, count: MAX_STACK };
-          next[selectedIndex] = { blockType: source.blockType, count: total - MAX_STACK };
+          const leftover = total - MAX_STACK;
+          if (splitMove) {
+            // Add leftover back to source slot
+            const existing = next[selectedIndex];
+            if (existing.blockType === source.blockType) {
+              next[selectedIndex] = { blockType: source.blockType, count: existing.count + leftover };
+            } else {
+              next[selectedIndex] = { blockType: source.blockType, count: leftover };
+            }
+          } else {
+            next[selectedIndex] = { blockType: source.blockType, count: leftover };
+          }
+        }
+      } else if (splitMove) {
+        // Split move to empty or different-type slot: just place held items, don't touch source
+        if (targetEmpty) {
+          next[index] = { blockType: source.blockType, count: source.count };
+        } else {
+          // Target has different type - swap target into a free slot or back to source
+          next[index] = { blockType: source.blockType, count: source.count };
+          // Put displaced target items back to source if source has space
+          const srcSlot = next[selectedIndex];
+          if (srcSlot.blockType === null || srcSlot.count <= 0) {
+            next[selectedIndex] = { blockType: target.blockType, count: target.count };
+          } else if (srcSlot.blockType === target.blockType && srcSlot.count + target.count <= MAX_STACK) {
+            next[selectedIndex] = { blockType: target.blockType, count: srcSlot.count + target.count };
+          } else {
+            // Find another empty slot
+            let placed = false;
+            for (let i = 0; i < next.length; i++) {
+              if ((next[i].blockType === null || next[i].count <= 0) && i !== index) {
+                next[i] = { blockType: target.blockType, count: target.count };
+                placed = true;
+                break;
+              }
+            }
+            if (!placed) return; // no space, abort
+          }
         }
       } else {
         next[selectedIndex] = { blockType: target.blockType, count: target.count };
