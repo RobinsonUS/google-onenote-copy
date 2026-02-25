@@ -15,7 +15,7 @@ function renderCubeIcon(canvas: HTMLCanvasElement, blockType: number) {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.set(2, 1.8, 2);
   camera.lookAt(0, 0, 0);
-  camera.zoom = 0.88;
+  camera.zoom = 0.72;
   camera.updateProjectionMatrix();
   const atlas = getBlockAtlasTexture();
   const faceRows: (0 | 1 | 2)[] = [1, 1, 0, 2, 1, 1];
@@ -55,7 +55,7 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
       ref={canvasRef}
       width={ICON_PX}
       height={ICON_PX}
-      style={{ imageRendering: 'auto', display: 'block', width: 15, height: 15, filter: 'saturate(1.45) brightness(1.1)' }}
+      style={{ imageRendering: 'auto', display: 'block', width: 24, height: 24, filter: 'saturate(1.45) brightness(1.1)' }}
     />
   );
 }
