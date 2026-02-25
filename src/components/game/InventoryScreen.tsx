@@ -76,7 +76,84 @@ interface InventoryScreenProps {
 
 export function InventoryScreen({ inventory, onInventoryChange, onClose, selectedHotbarIndex }: InventoryScreenProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [craftSlots, setCraftSlots] = useState<InventorySlot[]>([
+    { blockType: null, count: 0 },
+    { blockType: null, count: 0 },
+    { blockType: null, count: 0 },
+    { blockType: null, count: 0 },
+  ]);
   const slotSize = 48;
+
+  // Return crafting items to inventory on close
+  const handleClose = () => {
+    const hasItems = craftSlots.some(s => s.blockType !== null && s.count > 0);
+    if (hasItems) {
+      const next = inventory.map(s => ({ ...s }));
+      for (const cs of craftSlots) {
+        if (cs.blockType === null || cs.count <= 0) continue;
+        let remaining = cs.count;
+        for (let i = 0; i < next.length && remaining > 0; i++) {
+          if (next[i].blockType === cs.blockType) {
+            next[i] = { blockType: cs.blockType, count: next[i].count + remaining };
+            remaining = 0;
+          }
+        }
+        for (let i = 0; i < next.length && remaining > 0; i++) {
+          if (next[i].blockType === null || next[i].count <= 0) {
+            next[i] = { blockType: cs.blockType, count: remaining };
+            remaining = 0;
+          }
+        }
+      }
+      onInventoryChange(next);
+    }
+    onClose();
+  };
+
+  const handleCraftSlotClick = (craftIndex: number) => {
+    const virtualIndex = TOTAL_SLOTS + craftIndex;
+    if (selectedIndex === null) {
+      const cs = craftSlots[craftIndex];
+      if (cs.blockType !== null && cs.count > 0) {
+        setSelectedIndex(virtualIndex);
+      }
+    } else if (selectedIndex === virtualIndex) {
+      setSelectedIndex(null);
+    } else {
+      const isSourceCraft = selectedIndex >= TOTAL_SLOTS;
+      const sourceSlot = isSourceCraft
+        ? craftSlots[selectedIndex - TOTAL_SLOTS]
+        : inventory[selectedIndex];
+      const targetSlot = craftSlots[craftIndex];
+
+      const sourceEmpty = sourceSlot.blockType === null || sourceSlot.count <= 0;
+      const targetEmpty = targetSlot.blockType === null || targetSlot.count <= 0;
+      if (sourceEmpty && targetEmpty) { setSelectedIndex(null); return; }
+
+      const newSource: InventorySlot = { blockType: targetSlot.blockType, count: targetSlot.count };
+      let newTarget: InventorySlot;
+      if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
+        newTarget = { blockType: sourceSlot.blockType, count: targetSlot.count + sourceSlot.count };
+        newSource.blockType = null; newSource.count = 0;
+      } else {
+        newTarget = { blockType: sourceSlot.blockType, count: sourceSlot.count };
+      }
+
+      const nextCraft = [...craftSlots];
+      nextCraft[craftIndex] = newTarget;
+
+      if (isSourceCraft) {
+        nextCraft[selectedIndex - TOTAL_SLOTS] = newSource;
+        setCraftSlots(nextCraft);
+      } else {
+        setCraftSlots(nextCraft);
+        const nextInv = inventory.map(s => ({ ...s }));
+        nextInv[selectedIndex] = newSource;
+        onInventoryChange(nextInv);
+      }
+      setSelectedIndex(null);
+    }
+  };
 
   const handleSlotClick = (index: number) => {
     if (selectedIndex === null) {
@@ -84,6 +161,32 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     } else if (selectedIndex === index) {
       setSelectedIndex(null);
     } else {
+      // Source is a craft slot
+      const isSourceCraft = selectedIndex >= TOTAL_SLOTS;
+      const isTargetCraft = false; // regular inventory slots handled here
+      
+      if (isSourceCraft) {
+        const sourceSlot = craftSlots[selectedIndex - TOTAL_SLOTS];
+        const targetSlot = inventory[index];
+        const sourceEmpty = sourceSlot.blockType === null || sourceSlot.count <= 0;
+        const targetEmpty = targetSlot.blockType === null || targetSlot.count <= 0;
+        if (sourceEmpty && targetEmpty) { setSelectedIndex(null); return; }
+
+        const nextInv = inventory.map(s => ({ ...s }));
+        const nextCraft = [...craftSlots];
+        if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
+          nextInv[index] = { blockType: targetSlot.blockType, count: targetSlot.count + sourceSlot.count };
+          nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: null, count: 0 };
+        } else {
+          nextInv[index] = { blockType: sourceSlot.blockType, count: sourceSlot.count };
+          nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: targetSlot.blockType, count: targetSlot.count };
+        }
+        onInventoryChange(nextInv);
+        setCraftSlots(nextCraft);
+        setSelectedIndex(null);
+        return;
+      }
+
       const source = inventory[selectedIndex];
       const target = inventory[index];
       const sourceEmpty = source.blockType === null || source.count <= 0;
@@ -108,13 +211,8 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     }
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
   const renderSlot = (index: number, isHotbar: boolean = false) => {
     const slot = inventory[index];
-    const isSelectedHotbar = false;
     return (
       <div
         key={index}
@@ -123,6 +221,33 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
           width: slotSize, height: slotSize, cursor: 'pointer', flexShrink: 0,
         }}
         onPointerDown={() => handleSlotClick(index)}
+      >
+        {slot.blockType !== null && slot.count > 0 && (
+          <>
+            <SmallBlockIcon blockType={slot.blockType} />
+            {slot.count > 1 && (
+              <div className="mc-text" style={{
+                position: 'absolute', bottom: 1, right: 3,
+                fontSize: 7, color: '#fff', lineHeight: 1,
+              }}>
+                {slot.count}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderCraftSlot = (craftIndex: number) => {
+    const slot = craftSlots[craftIndex];
+    const virtualIndex = TOTAL_SLOTS + craftIndex;
+    return (
+      <div
+        key={`craft-${craftIndex}`}
+        className={`mc-slot ${selectedIndex === virtualIndex ? 'mc-slot-selected' : ''}`}
+        style={{ width: slotSize, height: slotSize, cursor: 'pointer' }}
+        onPointerDown={() => handleCraftSlotClick(craftIndex)}
       >
         {slot.blockType !== null && slot.count > 0 && (
           <>
@@ -158,22 +283,13 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         padding: 12,
         display: 'flex', flexDirection: 'column', gap: 2,
       }}>
-        {/* Crafting area */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 8, marginBottom: 8, minHeight: 120 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-            <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: '#404040' }}>
-              Fabrication
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                {[0, 1, 2, 3].map(i => (
-                  <div key={`craft-${i}`} className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
-                ))}
-              </div>
-              <div style={{ fontSize: 22, color: '#888', fontWeight: 'bold', lineHeight: 1 }}>➜</div>
-              <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
-            </div>
+        {/* Crafting area - centered */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 8, minHeight: 110 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            {[0, 1, 2, 3].map(i => renderCraftSlot(i))}
           </div>
+          <div style={{ fontSize: 22, color: '#888', fontWeight: 'bold', lineHeight: 1 }}>➜</div>
+          <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
         </div>
 
         {/* Separator */}
