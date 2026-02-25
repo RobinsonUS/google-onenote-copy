@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { InventorySlot, HOTBAR_SIZE } from "./HotBar";
-import { BLOCK_NAMES } from "@/lib/terrain";
+import { BLOCK_NAMES, BLOCK_TYPES } from "@/lib/terrain";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { getBlockAtlasTexture, getBlockUV, onAtlasUpdate } from "@/lib/textures";
@@ -83,6 +83,42 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     { blockType: null, count: 0 },
   ]);
   const slotSize = 48;
+
+  // Compute crafting result: exactly 1 slot has wood → 4 planks
+  const craftResult: InventorySlot = useMemo(() => {
+    const filledSlots = craftSlots.filter(s => s.blockType !== null && s.count > 0);
+    if (filledSlots.length === 1 && filledSlots[0].blockType === BLOCK_TYPES.WOOD) {
+      return { blockType: BLOCK_TYPES.PLANKS, count: filledSlots[0].count * 4 };
+    }
+    return { blockType: null, count: 0 };
+  }, [craftSlots]);
+
+  // Click on the result slot to collect crafted items
+  const handleResultClick = () => {
+    if (craftResult.blockType === null || craftResult.count <= 0) return;
+    // Try to add result to inventory
+    const nextInv = inventory.map(s => ({ ...s }));
+    let remaining = craftResult.count;
+    // Stack into existing
+    for (let i = 0; i < nextInv.length && remaining > 0; i++) {
+      if (nextInv[i].blockType === craftResult.blockType) {
+        nextInv[i] = { blockType: craftResult.blockType, count: nextInv[i].count + remaining };
+        remaining = 0;
+      }
+    }
+    // Fill empty slots
+    for (let i = 0; i < nextInv.length && remaining > 0; i++) {
+      if (nextInv[i].blockType === null || nextInv[i].count <= 0) {
+        nextInv[i] = { blockType: craftResult.blockType, count: remaining };
+        remaining = 0;
+      }
+    }
+    if (remaining > 0) return; // no space
+    // Clear craft slots
+    setCraftSlots(craftSlots.map(() => ({ blockType: null, count: 0 })));
+    onInventoryChange(nextInv);
+    setSelectedIndex(null);
+  };
 
   // Return crafting items to inventory on close
   const handleClose = () => {
@@ -289,7 +325,25 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
             {[0, 1, 2, 3].map(i => renderCraftSlot(i))}
           </div>
           <div style={{ fontSize: 22, color: '#888', fontWeight: 'bold', lineHeight: 1 }}>➜</div>
-          <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
+          <div
+            className="mc-slot"
+            style={{ width: slotSize, height: slotSize, cursor: craftResult.blockType !== null ? 'pointer' : 'default' }}
+            onPointerDown={handleResultClick}
+          >
+            {craftResult.blockType !== null && craftResult.count > 0 && (
+              <>
+                <SmallBlockIcon blockType={craftResult.blockType} />
+                {craftResult.count > 1 && (
+                  <div className="mc-text" style={{
+                    position: 'absolute', bottom: 1, right: 3,
+                    fontSize: 7, color: '#fff', lineHeight: 1,
+                  }}>
+                    {craftResult.count}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Separator */}
