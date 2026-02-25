@@ -159,17 +159,21 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         display: 'flex', flexDirection: 'column', gap: 2,
       }}>
         {/* Crafting area */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <div className="mc-text" style={{ fontSize: 8, color: '#404040', marginRight: 'auto' }}>
-            Fabrication
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 8, marginBottom: 8, minHeight: 120 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <div className="mc-text" style={{ fontSize: 8, color: '#404040' }}>
+              Fabrication
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                {[0, 1, 2, 3].map(i => (
+                  <div key={`craft-${i}`} className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
+                ))}
+              </div>
+              <div style={{ fontSize: 18, color: '#666' }}>→</div>
+              <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            {[0, 1, 2, 3].map(i => (
-              <div key={`craft-${i}`} className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
-            ))}
-          </div>
-          <div style={{ fontSize: 18, color: '#666', margin: '0 4px' }}>→</div>
-          <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
         </div>
 
         {/* Separator */}
