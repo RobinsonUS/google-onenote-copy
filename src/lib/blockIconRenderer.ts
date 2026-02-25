@@ -36,7 +36,7 @@ export function renderBlockIconToDataURL(blockType: number): string {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.set(2, 1.8, 2);
   camera.lookAt(0, 0, 0);
-  camera.zoom = 0.8;
+  camera.zoom = 1.15;
   camera.updateProjectionMatrix();
 
   const atlas = getBlockAtlasTexture();
