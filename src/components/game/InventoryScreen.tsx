@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { InventorySlot, HOTBAR_SIZE } from "./HotBar";
+import { InventorySlot, HOTBAR_SIZE, MAX_STACK } from "./HotBar";
 import { BLOCK_TYPES } from "@/lib/terrain";
 import { onAtlasUpdate } from "@/lib/textures";
 import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRenderer";
@@ -62,16 +62,18 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     let remaining = craftResult.count;
     // Stack into existing
     for (let i = 0; i < nextInv.length && remaining > 0; i++) {
-      if (nextInv[i].blockType === craftResult.blockType) {
-        nextInv[i] = { blockType: craftResult.blockType, count: nextInv[i].count + remaining };
-        remaining = 0;
+      if (nextInv[i].blockType === craftResult.blockType && nextInv[i].count < MAX_STACK) {
+        const canAdd = Math.min(remaining, MAX_STACK - nextInv[i].count);
+        nextInv[i] = { blockType: craftResult.blockType, count: nextInv[i].count + canAdd };
+        remaining -= canAdd;
       }
     }
     // Fill empty slots
     for (let i = 0; i < nextInv.length && remaining > 0; i++) {
       if (nextInv[i].blockType === null || nextInv[i].count <= 0) {
-        nextInv[i] = { blockType: craftResult.blockType, count: remaining };
-        remaining = 0;
+        const canAdd = Math.min(remaining, MAX_STACK);
+        nextInv[i] = { blockType: craftResult.blockType, count: canAdd };
+        remaining -= canAdd;
       }
     }
     if (remaining > 0) return; // no space
@@ -100,15 +102,17 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         if (cs.blockType === null || cs.count <= 0) continue;
         let remaining = cs.count;
         for (let i = 0; i < next.length && remaining > 0; i++) {
-          if (next[i].blockType === cs.blockType) {
-            next[i] = { blockType: cs.blockType, count: next[i].count + remaining };
-            remaining = 0;
+          if (next[i].blockType === cs.blockType && next[i].count < MAX_STACK) {
+            const canAdd = Math.min(remaining, MAX_STACK - next[i].count);
+            next[i] = { blockType: cs.blockType, count: next[i].count + canAdd };
+            remaining -= canAdd;
           }
         }
         for (let i = 0; i < next.length && remaining > 0; i++) {
           if (next[i].blockType === null || next[i].count <= 0) {
-            next[i] = { blockType: cs.blockType, count: remaining };
-            remaining = 0;
+            const canAdd = Math.min(remaining, MAX_STACK);
+            next[i] = { blockType: cs.blockType, count: canAdd };
+            remaining -= canAdd;
           }
         }
       }
@@ -137,11 +141,17 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       const targetEmpty = targetSlot.blockType === null || targetSlot.count <= 0;
       if (sourceEmpty && targetEmpty) { setSelectedIndex(null); return; }
 
-      const newSource: InventorySlot = { blockType: targetSlot.blockType, count: targetSlot.count };
+      let newSource: InventorySlot = { blockType: targetSlot.blockType, count: targetSlot.count };
       let newTarget: InventorySlot;
       if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
-        newTarget = { blockType: sourceSlot.blockType, count: targetSlot.count + sourceSlot.count };
-        newSource.blockType = null; newSource.count = 0;
+        const total = targetSlot.count + sourceSlot.count;
+        if (total <= MAX_STACK) {
+          newTarget = { blockType: sourceSlot.blockType, count: total };
+          newSource.blockType = null; newSource.count = 0;
+        } else {
+          newTarget = { blockType: sourceSlot.blockType, count: MAX_STACK };
+          newSource = { blockType: sourceSlot.blockType, count: total - MAX_STACK };
+        }
       } else {
         newTarget = { blockType: sourceSlot.blockType, count: sourceSlot.count };
       }
@@ -182,8 +192,14 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         const nextInv = inventory.map(s => ({ ...s }));
         const nextCraft = [...craftSlots];
         if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
-          nextInv[index] = { blockType: targetSlot.blockType, count: targetSlot.count + sourceSlot.count };
-          nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: null, count: 0 };
+          const total = targetSlot.count + sourceSlot.count;
+          if (total <= MAX_STACK) {
+            nextInv[index] = { blockType: targetSlot.blockType, count: total };
+            nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: null, count: 0 };
+          } else {
+            nextInv[index] = { blockType: targetSlot.blockType, count: MAX_STACK };
+            nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: sourceSlot.blockType, count: total - MAX_STACK };
+          }
         } else {
           nextInv[index] = { blockType: sourceSlot.blockType, count: sourceSlot.count };
           nextCraft[selectedIndex - TOTAL_SLOTS] = { blockType: targetSlot.blockType, count: targetSlot.count };
@@ -206,8 +222,14 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
 
       const next = inventory.map(s => ({ ...s }));
       if (source.blockType !== null && source.count > 0 && target.blockType === source.blockType) {
-        next[index] = { blockType: target.blockType!, count: target.count + source.count };
-        next[selectedIndex] = { blockType: null, count: 0 };
+        const total = target.count + source.count;
+        if (total <= MAX_STACK) {
+          next[index] = { blockType: target.blockType!, count: total };
+          next[selectedIndex] = { blockType: null, count: 0 };
+        } else {
+          next[index] = { blockType: target.blockType!, count: MAX_STACK };
+          next[selectedIndex] = { blockType: source.blockType, count: total - MAX_STACK };
+        }
       } else {
         next[selectedIndex] = { blockType: target.blockType, count: target.count };
         next[index] = { blockType: source.blockType, count: source.count };
