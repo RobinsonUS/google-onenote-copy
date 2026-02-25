@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
+import { useEffect, useState } from "react";
 import { BLOCK_NAMES } from "@/lib/terrain";
-import { getBlockAtlasTexture, getBlockUV, onAtlasUpdate } from "@/lib/textures";
+import { onAtlasUpdate } from "@/lib/textures";
+import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRenderer";
 
 export interface InventorySlot {
   blockType: number | null;
@@ -42,67 +42,23 @@ export function removeFromInventory(inventory: InventorySlot[], index: number): 
   return next;
 }
 
-const ICON_PX = 64;
-
-function renderCubeIcon(canvas: HTMLCanvasElement, blockType: number) {
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setSize(ICON_PX, ICON_PX);
-  renderer.setClearColor(0x000000, 0);
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-  camera.position.set(2, 1.8, 2);
-  camera.lookAt(0, 0, 0);
-  camera.zoom = 0.8;
-  camera.updateProjectionMatrix();
-
-  const atlas = getBlockAtlasTexture();
-  const faceRows: (0 | 1 | 2)[] = [1, 1, 0, 2, 1, 1];
-
-  const geo = new THREE.BoxGeometry(1, 1, 1);
-  const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute;
-
-  for (let face = 0; face < 6; face++) {
-    const [u0, u1, v0, v1] = getBlockUV(blockType, faceRows[face]);
-    const base = face * 4;
-    uvAttr.setXY(base + 0, u0, v1);
-    uvAttr.setXY(base + 1, u1, v1);
-    uvAttr.setXY(base + 2, u0, v0);
-    uvAttr.setXY(base + 3, u1, v0);
-  }
-  uvAttr.needsUpdate = true;
-
-  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughness: 1, metalness: 0 });
-  scene.add(new THREE.Mesh(geo, mat));
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-  dir.position.set(1, 2, 2);
-  scene.add(dir);
-
-  renderer.render(scene, camera);
-  geo.dispose();
-  mat.dispose();
-  renderer.dispose();
-}
-
 function BlockIcon({ blockType }: { blockType: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [src, setSrc] = useState('');
   const [tick, setTick] = useState(0);
 
-  useEffect(() => onAtlasUpdate(() => setTick(t => t + 1)), []);
+  useEffect(() => onAtlasUpdate(() => { clearIconCache(); setTick(t => t + 1); }), []);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    renderCubeIcon(canvasRef.current, blockType);
+    setSrc(renderBlockIconToDataURL(blockType));
   }, [blockType, tick]);
 
+  if (!src) return null;
   return (
-    <canvas
-      ref={canvasRef}
-      width={ICON_PX}
-      height={ICON_PX}
-      style={{ imageRendering: 'auto', display: 'block', width: 24, height: 24, filter: 'saturate(1.45) brightness(1.1)' }}
+    <img
+      src={src}
+      width={24}
+      height={24}
+      style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)' }}
     />
   );
 }
