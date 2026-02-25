@@ -195,20 +195,34 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     if (selectedIndex === null) {
       const cs = craftSlots[craftIndex];
       if (cs.blockType !== null && cs.count > 0) {
+        // Pick up from craft slot: store in heldItems and clear craft slot
+        setHeldItems({ blockType: cs.blockType, count: cs.count });
+        const nextCraft = [...craftSlots];
+        nextCraft[craftIndex] = { blockType: null, count: 0 };
+        setCraftSlots(nextCraft);
         setSelectedIndex(virtualIndex);
+        setIsSplitPick(false);
       }
     } else if (selectedIndex === virtualIndex) {
+      // Put back held items into craft slot
+      if (heldItems.blockType !== null && heldItems.count > 0) {
+        const nextCraft = [...craftSlots];
+        nextCraft[craftIndex] = { blockType: heldItems.blockType, count: heldItems.count };
+        setCraftSlots(nextCraft);
+      }
       setSelectedIndex(null);
+      setHeldItems({ blockType: null, count: 0 });
     } else {
       const isSourceCraft = selectedIndex >= TOTAL_SLOTS;
-      const sourceSlot = isSourceCraft
+      // Use heldItems as the source (items are already picked up)
+      const sourceSlot = heldItems.blockType !== null ? heldItems : (isSourceCraft
         ? craftSlots[selectedIndex - TOTAL_SLOTS]
-        : inventory[selectedIndex];
+        : inventory[selectedIndex]);
       const targetSlot = craftSlots[craftIndex];
 
       const sourceEmpty = sourceSlot.blockType === null || sourceSlot.count <= 0;
       const targetEmpty = targetSlot.blockType === null || targetSlot.count <= 0;
-      if (sourceEmpty && targetEmpty) { setSelectedIndex(null); return; }
+      if (sourceEmpty && targetEmpty) { setSelectedIndex(null); setHeldItems({ blockType: null, count: 0 }); return; }
 
       let newSource: InventorySlot = { blockType: targetSlot.blockType, count: targetSlot.count };
       let newTarget: InventorySlot;
@@ -229,15 +243,32 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       nextCraft[craftIndex] = newTarget;
 
       if (isSourceCraft) {
-        nextCraft[selectedIndex - TOTAL_SLOTS] = newSource;
+        // Source was a craft slot - it's already cleared, put swap back if needed
+        if (newSource.blockType !== null && newSource.count > 0) {
+          nextCraft[selectedIndex - TOTAL_SLOTS] = newSource;
+        }
         setCraftSlots(nextCraft);
       } else {
         setCraftSlots(nextCraft);
-        const nextInv = inventory.map(s => ({ ...s }));
-        nextInv[selectedIndex] = newSource;
-        onInventoryChange(nextInv);
+        // Only update inventory source if not a split pick (remainder already there)
+        if (!isSplitPick) {
+          const nextInv = inventory.map(s => ({ ...s }));
+          nextInv[selectedIndex] = newSource;
+          onInventoryChange(nextInv);
+        } else if (newSource.blockType !== null && newSource.count > 0) {
+          // Split pick with leftover: add back to inventory source
+          const nextInv = inventory.map(s => ({ ...s }));
+          const existing = nextInv[selectedIndex];
+          if (existing.blockType === newSource.blockType) {
+            nextInv[selectedIndex] = { blockType: newSource.blockType, count: existing.count + newSource.count };
+          } else if (existing.blockType === null || existing.count <= 0) {
+            nextInv[selectedIndex] = newSource;
+          }
+          onInventoryChange(nextInv);
+        }
       }
       setSelectedIndex(null);
+      setHeldItems({ blockType: null, count: 0 });
     }
   };
 
