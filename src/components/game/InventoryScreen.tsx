@@ -14,8 +14,8 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
   return (
     <img
       src={src}
-      width={24}
-      height={24}
+      width={32}
+      height={32}
       style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)' }}
     />
   );
