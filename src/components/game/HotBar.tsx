@@ -53,7 +53,7 @@ function renderCubeIcon(canvas: HTMLCanvasElement, blockType: number) {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.set(2, 1.8, 2);
   camera.lookAt(0, 0, 0);
-  camera.zoom = 0.72;
+  camera.zoom = 0.8;
   camera.updateProjectionMatrix();
 
   const atlas = getBlockAtlasTexture();
