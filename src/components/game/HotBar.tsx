@@ -102,7 +102,7 @@ function BlockIcon({ blockType }: { blockType: number }) {
       ref={canvasRef}
       width={ICON_PX}
       height={ICON_PX}
-      style={{ imageRendering: 'auto', display: 'block', width: 20, height: 20, filter: 'saturate(1.45) brightness(1.1)' }}
+      style={{ imageRendering: 'auto', display: 'block', width: 15, height: 15, filter: 'saturate(1.45) brightness(1.1)' }}
     />
   );
 }
