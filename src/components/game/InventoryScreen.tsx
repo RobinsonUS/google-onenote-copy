@@ -161,7 +161,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         {/* Crafting area */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 8, marginBottom: 8, minHeight: 120 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-            <div className="mc-text" style={{ fontSize: 8, color: '#404040' }}>
+            <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: '#404040' }}>
               Fabrication
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -170,7 +170,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
                   <div key={`craft-${i}`} className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
                 ))}
               </div>
-              <div style={{ fontSize: 18, color: '#666' }}>→</div>
+              <div style={{ fontSize: 22, color: '#888', fontWeight: 'bold', lineHeight: 1 }}>➜</div>
               <div className="mc-slot" style={{ width: slotSize, height: slotSize, opacity: 0.6 }} />
             </div>
           </div>
