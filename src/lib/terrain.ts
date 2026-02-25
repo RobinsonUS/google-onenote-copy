@@ -51,6 +51,7 @@ export const BLOCK_TYPES = {
   WATER: 6,
   LEAVES: 7,
   SNOW: 8,
+  PLANKS: 9,
 } as const;
 
 export type BlockType = typeof BLOCK_TYPES[keyof typeof BLOCK_TYPES];
@@ -65,6 +66,7 @@ export const BLOCK_COLORS: Record<number, string> = {
   [BLOCK_TYPES.WATER]: '#2196F3',
   [BLOCK_TYPES.LEAVES]: '#2E7D32',
   [BLOCK_TYPES.SNOW]: '#ECEFF1',
+  [BLOCK_TYPES.PLANKS]: '#B8945A',
 };
 
 export const BLOCK_THREE_COLORS: Record<number, number> = {
@@ -76,6 +78,7 @@ export const BLOCK_THREE_COLORS: Record<number, number> = {
   [BLOCK_TYPES.WATER]: 0x2662c8,
   [BLOCK_TYPES.LEAVES]: 0x2a6b1e,
   [BLOCK_TYPES.SNOW]: 0xe0eaf0,
+  [BLOCK_TYPES.PLANKS]: 0xb8945a,
 };
 
 export const BLOCK_NAMES: Record<number, string> = {
@@ -85,6 +88,7 @@ export const BLOCK_NAMES: Record<number, string> = {
   [BLOCK_TYPES.WOOD]: 'Bois',
   [BLOCK_TYPES.SAND]: 'Sable',
   [BLOCK_TYPES.LEAVES]: 'Feuilles',
+  [BLOCK_TYPES.PLANKS]: 'Planches',
 };
 
 export type WorldData = Map<string, BlockType>;

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { BLOCK_TYPES } from "./terrain";
 
 const CELL = 16;
-const COLS = 9;
+const COLS = 10;
 const ROWS = 3;
 
 type Pixel = [number, number, number];
@@ -127,6 +127,12 @@ const SNOW_SIDE: Pixel[][] = (() => {
   }));
 })();
 
+const PLANKS: Pixel[][] = (() => {
+  const rand = seededRand(11);
+  const palette = [px(184,148,90), px(170,135,78), px(160,126,70), px(195,160,100), px(175,140,82)];
+  return Array.from({length:16}, () => Array.from({length:16}, () => palette[Math.floor(rand()*palette.length)]));
+})();
+
 // [top, side, bottom]
 const BLOCK_TEXTURES: Record<number, [Pixel[][], Pixel[][], Pixel[][]]> = {
   [BLOCK_TYPES.GRASS]: [GRASS_TOP, GRASS_SIDE, DIRT],
@@ -137,6 +143,7 @@ const BLOCK_TEXTURES: Record<number, [Pixel[][], Pixel[][], Pixel[][]]> = {
   [BLOCK_TYPES.WATER]: [WATER, WATER, WATER],
   [BLOCK_TYPES.LEAVES]:[LEAVES, LEAVES, LEAVES],
   [BLOCK_TYPES.SNOW]:  [SNOW, SNOW_SIDE, DIRT],
+  [BLOCK_TYPES.PLANKS]:[PLANKS, PLANKS, PLANKS],
 };
 
 let cachedTexture: THREE.CanvasTexture | null = null;
@@ -184,7 +191,7 @@ export function getBlockAtlasTexture(): THREE.CanvasTexture {
     data[idx] = pixel[0]; data[idx+1] = pixel[1]; data[idx+2] = pixel[2]; data[idx+3] = 255;
   }
 
-  const blockTypes = [BLOCK_TYPES.GRASS, BLOCK_TYPES.DIRT, BLOCK_TYPES.STONE, BLOCK_TYPES.WOOD, BLOCK_TYPES.SAND, BLOCK_TYPES.WATER, BLOCK_TYPES.LEAVES, BLOCK_TYPES.SNOW];
+  const blockTypes = [BLOCK_TYPES.GRASS, BLOCK_TYPES.DIRT, BLOCK_TYPES.STONE, BLOCK_TYPES.WOOD, BLOCK_TYPES.SAND, BLOCK_TYPES.WATER, BLOCK_TYPES.LEAVES, BLOCK_TYPES.SNOW, BLOCK_TYPES.PLANKS];
   
   blockTypes.forEach((bt, colIdx) => {
     const tex = BLOCK_TEXTURES[bt];
@@ -236,13 +243,17 @@ export function getBlockAtlasTexture(): THREE.CanvasTexture {
   loadTextureOverlay(texture, canvas, '/textures/grass_side.webp', [
     [grassCol, 1],
   ]);
+  const planksCol = BLOCK_ATLAS_COL[BLOCK_TYPES.PLANKS];
+  loadTextureOverlay(texture, canvas, '/textures/planks.webp', [
+    [planksCol, 0], [planksCol, 1], [planksCol, 2],
+  ]);
 
   return texture;
 }
 
 const BLOCK_ATLAS_COL: Record<number, number> = {
   [BLOCK_TYPES.GRASS]: 0, [BLOCK_TYPES.DIRT]: 1, [BLOCK_TYPES.STONE]: 2, [BLOCK_TYPES.WOOD]: 3,
-  [BLOCK_TYPES.SAND]: 4, [BLOCK_TYPES.WATER]: 5, [BLOCK_TYPES.LEAVES]: 6, [BLOCK_TYPES.SNOW]: 7,
+  [BLOCK_TYPES.SAND]: 4, [BLOCK_TYPES.WATER]: 5, [BLOCK_TYPES.LEAVES]: 6, [BLOCK_TYPES.SNOW]: 7, [BLOCK_TYPES.PLANKS]: 8,
 };
 
 export function getBlockUV(blockType: number, faceRow: 0 | 1 | 2): [number, number, number, number] {
