@@ -1,14 +1,23 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { InventorySlot, HOTBAR_SIZE, MAX_STACK } from "./HotBar";
-import { BLOCK_TYPES } from "@/lib/terrain";
+import { BLOCK_TYPES, isItem, ITEM_TYPES } from "@/lib/terrain";
 import { onAtlasUpdate } from "@/lib/textures";
 import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRenderer";
+// Map item IDs to their texture paths
+const ITEM_TEXTURES: Record<number, string> = {
+  [ITEM_TYPES.STICK]: '/textures/stick.webp',
+};
+
 function SmallBlockIcon({ blockType }: { blockType: number }) {
   const [src, setSrc] = useState('');
   const [tick, setTick] = useState(0);
   useEffect(() => onAtlasUpdate(() => { clearIconCache(); setTick(t => t + 1); }), []);
   useEffect(() => {
-    setSrc(renderBlockIconToDataURL(blockType));
+    if (isItem(blockType)) {
+      setSrc(ITEM_TEXTURES[blockType] || '');
+    } else {
+      setSrc(renderBlockIconToDataURL(blockType));
+    }
   }, [blockType, tick]);
   if (!src) return null;
    return (
@@ -18,7 +27,7 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
       height={40}
       draggable={false}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none' }}
+      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none' }}
     />
   );
 }
@@ -116,11 +125,25 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     }
   };
 
-  // Compute crafting result: exactly 1 slot has wood → 4 planks
+  // Compute crafting result
   const craftResult: InventorySlot = useMemo(() => {
     const filledSlots = craftSlots.filter(s => s.blockType !== null && s.count > 0);
+    const slots = craftSlots.map(s => s.blockType);
+    // Wood → 4 planks (single wood in any slot)
     if (filledSlots.length === 1 && filledSlots[0].blockType === BLOCK_TYPES.WOOD) {
       return { blockType: BLOCK_TYPES.PLANKS, count: 4 };
+    }
+    // Stick: 2 planks horizontally (slots [0,1] or [2,3] with the pattern plank-empty or empty-plank in each row)
+    // Pattern: top row = [plank, null] and bottom row = [plank, null] → not this
+    // Actually: plank-null-plank-null (slots 0,2) or null-plank-null-plank (slots 1,3) — vertical columns
+    // Wait, the user said "horizontalement" — slots layout is 2x2: [0,1 / 2,3] 
+    // "planche - rien - planche - rien" = slots 0,1,2,3 → 0=plank,1=null,2=plank,3=null
+    // "rien - planche - rien - planche" = 0=null,1=plank,2=null,3=plank
+    if (filledSlots.length === 2 && filledSlots.every(s => s.blockType === BLOCK_TYPES.PLANKS)) {
+      if ((slots[0] === BLOCK_TYPES.PLANKS && slots[1] === null && slots[2] === BLOCK_TYPES.PLANKS && slots[3] === null) ||
+          (slots[0] === null && slots[1] === BLOCK_TYPES.PLANKS && slots[2] === null && slots[3] === BLOCK_TYPES.PLANKS)) {
+        return { blockType: ITEM_TYPES.STICK, count: 4 };
+      }
     }
     return { blockType: null, count: 0 };
   }, [craftSlots]);
@@ -148,7 +171,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       }
     }
     if (remaining > 0) return; // no space
-    // Consume only 1 input item from the craft slot
+    // Consume 1 input item from each filled craft slot
     const nextCraft = craftSlots.map(s => ({ ...s }));
     for (let i = 0; i < nextCraft.length; i++) {
       if (nextCraft[i].blockType !== null && nextCraft[i].count > 0) {
@@ -156,7 +179,6 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         if (nextCraft[i].count <= 0) {
           nextCraft[i] = { blockType: null, count: 0 };
         }
-        break;
       }
     }
     setCraftSlots(nextCraft);

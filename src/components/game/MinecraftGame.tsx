@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Sky } from "@react-three/drei";
 import * as THREE from "three";
-import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType } from "@/lib/terrain";
+import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType, isItem } from "@/lib/terrain";
 import { VoxelChunk } from "./VoxelChunk";
 import { TouchJoystick } from "./TouchJoystick";
 import { HotBar, InventorySlot, addToInventory, removeFromInventory } from "./HotBar";
@@ -349,6 +349,7 @@ export function MinecraftGame() {
   const placeBlock = useCallback((screenX?: number, screenY?: number) => {
     const slot = inventoryRef.current[selectedIndex];
     if (!slot || slot.blockType === null || slot.count <= 0) return;
+    if (isItem(slot.blockType)) return; // Items cannot be placed
     const selectedBlock = slot.blockType;
 
     let result: ReturnType<typeof screenRaycast> = null;
