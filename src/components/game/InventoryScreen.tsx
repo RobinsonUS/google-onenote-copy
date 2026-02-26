@@ -11,12 +11,14 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
     setSrc(renderBlockIconToDataURL(blockType));
   }, [blockType, tick]);
   if (!src) return null;
-  return (
+   return (
     <img
       src={src}
       width={40}
       height={40}
-      style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)' }}
+      draggable={false}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none' }}
     />
   );
 }
@@ -195,11 +197,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     if (selectedIndex === null) {
       const cs = craftSlots[craftIndex];
       if (cs.blockType !== null && cs.count > 0) {
-        // Pick up from craft slot: store in heldItems and clear craft slot
         setHeldItems({ blockType: cs.blockType, count: cs.count });
-        const nextCraft = [...craftSlots];
-        nextCraft[craftIndex] = { blockType: null, count: 0 };
-        setCraftSlots(nextCraft);
         setSelectedIndex(virtualIndex);
         setIsSplitPick(false);
       }
@@ -243,10 +241,11 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       nextCraft[craftIndex] = newTarget;
 
       if (isSourceCraft) {
-        // Source was a craft slot - it's already cleared, put swap back if needed
-        if (newSource.blockType !== null && newSource.count > 0) {
-          nextCraft[selectedIndex - TOTAL_SLOTS] = newSource;
-        }
+        // Clear the source craft slot, put swap back if needed
+        const srcCraftIdx = selectedIndex - TOTAL_SLOTS;
+        nextCraft[srcCraftIdx] = newSource.blockType !== null && newSource.count > 0
+          ? newSource
+          : { blockType: null, count: 0 };
         setCraftSlots(nextCraft);
       } else {
         setCraftSlots(nextCraft);
@@ -305,27 +304,26 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         if (sourceEmpty && targetEmpty) { setSelectedIndex(null); setHeldItems({ blockType: null, count: 0 }); return; }
 
         const nextInv = inventory.map(s => ({ ...s }));
+        const ci = selectedIndex - TOTAL_SLOTS;
+        const nextCraft = [...craftSlots];
         if (sourceSlot.blockType !== null && sourceSlot.count > 0 && targetSlot.blockType === sourceSlot.blockType) {
           const total = targetSlot.count + sourceSlot.count;
           if (total <= MAX_STACK) {
             nextInv[index] = { blockType: targetSlot.blockType, count: total };
+            nextCraft[ci] = { blockType: null, count: 0 };
           } else {
             nextInv[index] = { blockType: targetSlot.blockType, count: MAX_STACK };
-            // leftover goes back - but for simplicity just update craft slot
-            const ci = selectedIndex - TOTAL_SLOTS;
-            const nextCraft = [...craftSlots];
             nextCraft[ci] = { blockType: sourceSlot.blockType, count: total - MAX_STACK };
-            setCraftSlots(nextCraft);
           }
         } else {
           nextInv[index] = { blockType: sourceSlot.blockType, count: sourceSlot.count };
           if (!targetEmpty) {
-            const ci = selectedIndex - TOTAL_SLOTS;
-            const nextCraft = [...craftSlots];
             nextCraft[ci] = { blockType: targetSlot.blockType, count: targetSlot.count };
-            setCraftSlots(nextCraft);
+          } else {
+            nextCraft[ci] = { blockType: null, count: 0 };
           }
         }
+        setCraftSlots(nextCraft);
         onInventoryChange(nextInv);
         setSelectedIndex(null);
         setHeldItems({ blockType: null, count: 0 });
@@ -431,6 +429,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         onPointerLeave={() => {
           if (splitState) handleSplitPointerUp();
         }}
+        onContextMenu={(e) => e.preventDefault()}
       >
         {slot.blockType !== null && slot.count > 0 && (
           <>
@@ -478,6 +477,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         className={`mc-slot ${selectedIndex === virtualIndex ? 'mc-slot-selected' : ''}`}
         style={{ width: slotSize, height: slotSize, cursor: 'pointer' }}
         onPointerDown={() => handleCraftSlotClick(craftIndex)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         {slot.blockType !== null && slot.count > 0 && (
           <>
