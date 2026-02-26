@@ -446,22 +446,23 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
         )}
         {isSplitTarget && (
           <div style={{
-            position: 'absolute', bottom: -14, left: 0, right: 0,
-            height: 8, background: '#555', borderRadius: 2, overflow: 'hidden',
+            position: 'absolute', top: -18, left: -4, right: -4,
+            height: 14, background: '#555', borderRadius: 3, overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
               width: `${(splitState.selected / splitState.total) * 100}%`,
-              height: '100%', background: '#4caf50', borderRadius: 2,
+              background: '#4caf50', borderRadius: 3,
               transition: 'width 0.05s',
             }} />
-          </div>
-        )}
-        {isSplitTarget && (
-          <div className="mc-text" style={{
-            position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
-            fontSize: 8, color: '#4caf50', whiteSpace: 'nowrap',
-          }}>
-            {splitState.selected}/{splitState.total}
+            <span style={{
+              position: 'relative', zIndex: 1,
+              fontSize: 9, color: '#fff', fontFamily: 'monospace', fontWeight: 'bold',
+              textShadow: 'none', lineHeight: 1,
+            }}>
+              {splitState.selected}/{splitState.total}
+            </span>
           </div>
         )}
       </div>
