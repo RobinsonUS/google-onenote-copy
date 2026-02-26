@@ -281,15 +281,7 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
       setHeldItems({ blockType: slot.blockType, count: slot.count });
       setIsSplitPick(false);
     } else if (selectedIndex === index) {
-      // Put back held items
-      if (heldItems.blockType !== null && heldItems.count > 0) {
-        const nextInv = inventory.map(s => ({ ...s }));
-        const existing = nextInv[index];
-        if (existing.blockType === heldItems.blockType || existing.blockType === null) {
-          nextInv[index] = { blockType: heldItems.blockType, count: existing.count + heldItems.count };
-        }
-        onInventoryChange(nextInv);
-      }
+      // Deselect - items are already in slot (never cleared on pick), just reset state
       setSelectedIndex(null);
       setHeldItems({ blockType: null, count: 0 });
     } else {
