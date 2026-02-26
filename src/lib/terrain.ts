@@ -54,6 +54,21 @@ export const BLOCK_TYPES = {
   PLANKS: 9,
 } as const;
 
+// Non-block items (IDs >= 100, cannot be placed in the world)
+export const ITEM_TYPES = {
+  STICK: 100,
+} as const;
+
+export type ItemType = typeof ITEM_TYPES[keyof typeof ITEM_TYPES];
+
+export function isItem(id: number): boolean {
+  return id >= 100;
+}
+
+export const ITEM_NAMES: Record<number, string> = {
+  [ITEM_TYPES.STICK]: 'Bâton',
+};
+
 export type BlockType = typeof BLOCK_TYPES[keyof typeof BLOCK_TYPES];
 
 export const BLOCK_COLORS: Record<number, string> = {
@@ -90,6 +105,11 @@ export const BLOCK_NAMES: Record<number, string> = {
   [BLOCK_TYPES.LEAVES]: 'Feuilles',
   [BLOCK_TYPES.PLANKS]: 'Planches',
 };
+
+export function getItemOrBlockName(id: number): string {
+  if (isItem(id)) return ITEM_NAMES[id] || '';
+  return BLOCK_NAMES[id] || '';
+}
 
 export type WorldData = Map<string, BlockType>;
 

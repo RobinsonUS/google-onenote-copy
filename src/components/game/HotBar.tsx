@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { BLOCK_NAMES } from "@/lib/terrain";
+import { BLOCK_NAMES, isItem, ITEM_TYPES, getItemOrBlockName } from "@/lib/terrain";
 import { onAtlasUpdate } from "@/lib/textures";
 import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRenderer";
+
+const ITEM_TEXTURES: Record<number, string> = {
+  [ITEM_TYPES.STICK]: '/textures/stick.webp',
+};
 
 export interface InventorySlot {
   blockType: number | null;
@@ -50,7 +54,11 @@ function BlockIcon({ blockType }: { blockType: number }) {
   useEffect(() => onAtlasUpdate(() => { clearIconCache(); setTick(t => t + 1); }), []);
 
   useEffect(() => {
-    setSrc(renderBlockIconToDataURL(blockType));
+    if (isItem(blockType)) {
+      setSrc(ITEM_TEXTURES[blockType] || '');
+    } else {
+      setSrc(renderBlockIconToDataURL(blockType));
+    }
   }, [blockType, tick]);
 
   if (!src) return null;
@@ -59,7 +67,7 @@ function BlockIcon({ blockType }: { blockType: number }) {
       src={src}
       width={40}
       height={40}
-      style={{ imageRendering: 'auto', display: 'block', filter: 'saturate(1.45) brightness(1.1)' }}
+      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)' }}
     />
   );
 }
@@ -94,7 +102,7 @@ export function HotBar({ inventory, selectedIndex, onSelect, onOpenInventory }: 
             className={isSelected ? 'mc-slot mc-slot-selected' : 'mc-slot'}
             style={{ width: slotSize, height: slotSize, cursor: 'pointer', flexShrink: 0 }}
             onPointerDown={() => onSelect(i)}
-            title={slot.blockType !== null ? BLOCK_NAMES[slot.blockType] || '' : ''}
+            title={slot.blockType !== null ? getItemOrBlockName(slot.blockType) : ''}
           >
             {slot.blockType !== null && slot.count > 0 && (
               <>
