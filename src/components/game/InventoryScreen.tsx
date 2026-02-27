@@ -133,17 +133,16 @@ export function InventoryScreen({ inventory, onInventoryChange, onClose, selecte
     if (filledSlots.length === 1 && filledSlots[0].blockType === BLOCK_TYPES.WOOD) {
       return { blockType: BLOCK_TYPES.PLANKS, count: 4 };
     }
-    // Stick: 2 planks horizontally (slots [0,1] or [2,3] with the pattern plank-empty or empty-plank in each row)
-    // Pattern: top row = [plank, null] and bottom row = [plank, null] → not this
-    // Actually: plank-null-plank-null (slots 0,2) or null-plank-null-plank (slots 1,3) — vertical columns
-    // Wait, the user said "horizontalement" — slots layout is 2x2: [0,1 / 2,3] 
-    // "planche - rien - planche - rien" = slots 0,1,2,3 → 0=plank,1=null,2=plank,3=null
-    // "rien - planche - rien - planche" = 0=null,1=plank,2=null,3=plank
+    // Stick: 2 planks vertically (slots [0,2] or [1,3])
     if (filledSlots.length === 2 && filledSlots.every(s => s.blockType === BLOCK_TYPES.PLANKS)) {
       if ((slots[0] === BLOCK_TYPES.PLANKS && slots[1] === null && slots[2] === BLOCK_TYPES.PLANKS && slots[3] === null) ||
           (slots[0] === null && slots[1] === BLOCK_TYPES.PLANKS && slots[2] === null && slots[3] === BLOCK_TYPES.PLANKS)) {
         return { blockType: ITEM_TYPES.STICK, count: 4 };
       }
+    }
+    // Crafting table: 4 planks (all slots filled with planks)
+    if (filledSlots.length === 4 && filledSlots.every(s => s.blockType === BLOCK_TYPES.PLANKS)) {
+      return { blockType: BLOCK_TYPES.CRAFTING_TABLE, count: 1 };
     }
     return { blockType: null, count: 0 };
   }, [craftSlots]);
