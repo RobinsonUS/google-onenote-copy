@@ -52,6 +52,7 @@ export const BLOCK_TYPES = {
   LEAVES: 7,
   SNOW: 8,
   PLANKS: 9,
+  CRAFTING_TABLE: 10,
 } as const;
 
 // Non-block items (IDs >= 100, cannot be placed in the world)
@@ -82,6 +83,7 @@ export const BLOCK_COLORS: Record<number, string> = {
   [BLOCK_TYPES.LEAVES]: '#2E7D32',
   [BLOCK_TYPES.SNOW]: '#ECEFF1',
   [BLOCK_TYPES.PLANKS]: '#B8945A',
+  [BLOCK_TYPES.CRAFTING_TABLE]: '#8B6914',
 };
 
 export const BLOCK_THREE_COLORS: Record<number, number> = {
@@ -94,6 +96,7 @@ export const BLOCK_THREE_COLORS: Record<number, number> = {
   [BLOCK_TYPES.LEAVES]: 0x2a6b1e,
   [BLOCK_TYPES.SNOW]: 0xe0eaf0,
   [BLOCK_TYPES.PLANKS]: 0xb8945a,
+  [BLOCK_TYPES.CRAFTING_TABLE]: 0x8b6914,
 };
 
 export const BLOCK_NAMES: Record<number, string> = {
@@ -104,6 +107,7 @@ export const BLOCK_NAMES: Record<number, string> = {
   [BLOCK_TYPES.SAND]: 'Sable',
   [BLOCK_TYPES.LEAVES]: 'Feuilles',
   [BLOCK_TYPES.PLANKS]: 'Planches',
+  [BLOCK_TYPES.CRAFTING_TABLE]: 'Établi',
 };
 
 export function getItemOrBlockName(id: number): string {
