@@ -9,6 +9,7 @@ import { HotBar, InventorySlot, addToInventory, removeFromInventory } from "./Ho
 import { BlockParticles, useBlockParticles } from "./BlockParticles";
 import { DroppedItems, DroppedItem, createDroppedItem } from "./DroppedItems";
 import { InventoryScreen, createFullInventory, TOTAL_SLOTS } from "./InventoryScreen";
+import { CraftingTableScreen } from "./CraftingTableScreen";
 
 // ─── Swept AABB collision helpers ─────────────────────────────────────────────
 
@@ -289,6 +290,7 @@ export function MinecraftGame() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inventory, setInventory] = useState<InventorySlot[]>(createFullInventory());
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [craftingTableOpen, setCraftingTableOpen] = useState(false);
   const moveRef   = useRef({ dx: 0, dz: 0 });
   const camRef    = useRef<CamState>({ yaw: 0, pitch: 0 });
   const camPosRef = useRef(new THREE.Vector3(2, 30, 2));
@@ -360,6 +362,11 @@ export function MinecraftGame() {
     }
 
     if (result?.hit) {
+      // If clicking on a crafting table, open its UI instead of placing
+      if (result.blockType === BLOCK_TYPES.CRAFTING_TABLE) {
+        setCraftingTableOpen(true);
+        return;
+      }
       const { placeX, placeY, placeZ } = result;
       if (blockOverlapsPlayer(placeX, placeY, placeZ, camPosRef.current)) return;
       const key = posKey(placeX, placeY, placeZ);
@@ -460,13 +467,13 @@ export function MinecraftGame() {
         const dx = touch.clientX - lookTouchRef.current.startX;
         const dy = touch.clientY - lookTouchRef.current.startY;
         const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
-        if (!moved && elapsed < 300) {
+        if (!moved && elapsed < 300 && !craftingTableOpen) {
           placeBlock(lookTouchRef.current.startX, lookTouchRef.current.startY);
         }
         lookTouchRef.current = null;
       }
     }
-  }, [placeBlock, clearBreakInterval]);
+  }, [placeBlock, clearBreakInterval, craftingTableOpen]);
 
   // Keyboard controls
   useEffect(() => {
@@ -609,6 +616,14 @@ export function MinecraftGame() {
           inventory={inventory}
           onInventoryChange={setInventory}
           onClose={() => setInventoryOpen(false)}
+          selectedHotbarIndex={selectedIndex}
+        />
+      )}
+      {craftingTableOpen && (
+        <CraftingTableScreen
+          inventory={inventory}
+          onInventoryChange={setInventory}
+          onClose={() => setCraftingTableOpen(false)}
           selectedHotbarIndex={selectedIndex}
         />
       )}
