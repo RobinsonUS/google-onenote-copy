@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Sky } from "@react-three/drei";
 import * as THREE from "three";
-import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType, isItem } from "@/lib/terrain";
+import { generateTerrain, WorldData, BLOCK_TYPES, posKey, BlockType, isItem, getBlockBreakTime } from "@/lib/terrain";
 import { VoxelChunk } from "./VoxelChunk";
 import { TouchJoystick } from "./TouchJoystick";
 import { HotBar, InventorySlot, addToInventory, removeFromInventory } from "./HotBar";
@@ -10,6 +10,7 @@ import { BlockParticles, useBlockParticles } from "./BlockParticles";
 import { DroppedItems, DroppedItem, createDroppedItem } from "./DroppedItems";
 import { InventoryScreen, createFullInventory, TOTAL_SLOTS } from "./InventoryScreen";
 import { CraftingTableScreen } from "./CraftingTableScreen";
+import { MiningOverlay } from "./MiningOverlay";
 
 // ─── Swept AABB collision helpers ─────────────────────────────────────────────
 
@@ -307,12 +308,21 @@ export function MinecraftGame() {
     startTime: number;
   } | null>(null);
 
-  // Long-press continuous break state
-  const breakIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const breakDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isHoldingRef  = useRef(false);
+  // Mining state
+  const miningRef = useRef<{
+    active: boolean;
+    targetKey: string;
+    blockType: number;
+    elapsed: number;
+    lastTime: number;
+    screenX?: number;
+    screenY?: number;
+  } | null>(null);
+  const [miningProgress, setMiningProgress] = useState(0);
+  const [miningActive, setMiningActive] = useState(false);
+  const miningRafRef = useRef<number | null>(null);
   const holdTouchPosRef = useRef({ x: 0, y: 0 });
-  const hasFirstBrokenRef = useRef(false);
+  const isHoldingRef = useRef(false);
 
   const onCamPos = useCallback((pos: THREE.Vector3) => {
     camPosRef.current.copy(pos);
@@ -328,21 +338,103 @@ export function MinecraftGame() {
     setInventory(inv => addToInventory(inv, blockType));
   }, []);
 
-  // Break block: emit particles, drop item, remove block
-  const breakBlock = useCallback((screenX?: number, screenY?: number) => {
+  // Start/continue mining a block
+  const startMining = useCallback((screenX?: number, screenY?: number) => {
     let result: ReturnType<typeof screenRaycast> = null;
     if (screenX !== undefined && screenY !== undefined && cameraRef.current) {
       result = screenRaycast(screenX, screenY, cameraRef.current, worldRef.current);
     } else {
       result = raycastBlock(camPosRef.current, camRef.current.yaw, camRef.current.pitch, worldRef.current);
     }
-    if (result?.hit) {
-      emitParticles(result.x, result.y, result.z, result.blockType);
-      // Drop item
-      droppedItemsRef.current.push(createDroppedItem(result.x, result.y, result.z, result.blockType));
-      mutateWorld(w => w.delete(posKey(result.x, result.y, result.z)));
+    if (!result?.hit) {
+      stopMining();
+      return;
     }
+    const key = posKey(result.x, result.y, result.z);
+    const mining = miningRef.current;
+    // If already mining the same block, continue
+    if (mining && mining.active && mining.targetKey === key) return;
+    // Start mining new block
+    miningRef.current = {
+      active: true,
+      targetKey: key,
+      blockType: result.blockType,
+      elapsed: 0,
+      lastTime: performance.now(),
+      screenX, screenY,
+    };
+    setMiningActive(true);
+    setMiningProgress(0);
+    // Start the mining loop
+    if (!miningRafRef.current) {
+      miningRafRef.current = requestAnimationFrame(miningLoop);
+    }
+  }, []);
+
+  const stopMining = useCallback(() => {
+    miningRef.current = null;
+    setMiningActive(false);
+    setMiningProgress(0);
+    if (miningRafRef.current) {
+      cancelAnimationFrame(miningRafRef.current);
+      miningRafRef.current = null;
+    }
+  }, []);
+
+  const miningLoop = useCallback(() => {
+    const mining = miningRef.current;
+    if (!mining || !mining.active) {
+      miningRafRef.current = null;
+      setMiningActive(false);
+      setMiningProgress(0);
+      return;
+    }
+    const now = performance.now();
+    const dt = (now - mining.lastTime) / 1000;
+    mining.lastTime = now;
+    mining.elapsed += dt;
+
+    const breakTime = getBlockBreakTime(mining.blockType);
+    const progress = Math.min(mining.elapsed / breakTime, 1);
+    setMiningProgress(progress);
+
+    if (progress >= 1) {
+      // Block is broken
+      const key = mining.targetKey;
+      const parts = key.split(',');
+      const bx = +parts[0], by = +parts[1], bz = +parts[2];
+      const bt = worldRef.current.get(key);
+      if (bt !== undefined && bt !== BLOCK_TYPES.AIR) {
+        emitParticles(bx, by, bz, bt);
+        droppedItemsRef.current.push(createDroppedItem(bx, by, bz, bt));
+        mutateWorld(w => w.delete(key));
+      }
+      // Reset and check if still holding to mine next block
+      miningRef.current = null;
+      setMiningProgress(0);
+      if (isHoldingRef.current) {
+        // Re-target next block
+        setTimeout(() => {
+          if (isHoldingRef.current) {
+            startMining(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
+          }
+        }, 50);
+      } else {
+        setMiningActive(false);
+      }
+      miningRafRef.current = null;
+      return;
+    }
+
+    miningRafRef.current = requestAnimationFrame(miningLoop);
   }, [emitParticles, mutateWorld]);
+
+  // Ensure miningLoop ref is always up to date for startMining
+  useEffect(() => {
+    if (miningRef.current?.active && !miningRafRef.current) {
+      miningRafRef.current = requestAnimationFrame(miningLoop);
+    }
+  }, [miningLoop]);
 
   // Place block: use inventory
   const inventoryRef = useRef(inventory);
@@ -351,7 +443,7 @@ export function MinecraftGame() {
   const placeBlock = useCallback((screenX?: number, screenY?: number) => {
     const slot = inventoryRef.current[selectedIndex];
     if (!slot || slot.blockType === null || slot.count <= 0) return;
-    if (isItem(slot.blockType)) return; // Items cannot be placed
+    if (isItem(slot.blockType)) return;
     const selectedBlock = slot.blockType;
 
     let result: ReturnType<typeof screenRaycast> = null;
@@ -362,7 +454,6 @@ export function MinecraftGame() {
     }
 
     if (result?.hit) {
-      // If clicking on a crafting table, open its UI instead of placing
       if (result.blockType === BLOCK_TYPES.CRAFTING_TABLE) {
         setCraftingTableOpen(true);
         return;
@@ -376,18 +467,6 @@ export function MinecraftGame() {
       }
     }
   }, [selectedIndex, mutateWorld]);
-
-  // Clear break timers
-  const clearBreakInterval = useCallback(() => {
-    if (breakDelayRef.current) {
-      clearTimeout(breakDelayRef.current);
-      breakDelayRef.current = null;
-    }
-    if (breakIntervalRef.current) {
-      clearInterval(breakIntervalRef.current);
-      breakIntervalRef.current = null;
-    }
-  }, []);
 
   // Touch look handlers
   const handleLookTouchStart = useCallback((e: React.TouchEvent) => {
@@ -406,38 +485,15 @@ export function MinecraftGame() {
         holdTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
         isHoldingRef.current = true;
 
-        hasFirstBrokenRef.current = false;
-        clearBreakInterval();
-        breakDelayRef.current = setTimeout(() => {
-          if (!isHoldingRef.current) return;
-          hasFirstBrokenRef.current = true;
-          breakBlock(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
-          breakIntervalRef.current = setInterval(() => {
-            if (isHoldingRef.current) {
-              breakBlock(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
-            }
-          }, 300);
-        }, 400);
+        // Start mining after a small delay to distinguish from tap
+        setTimeout(() => {
+          if (isHoldingRef.current && lookTouchRef.current) {
+            startMining(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
+          }
+        }, 200);
       }
     }
-  }, [breakBlock, clearBreakInterval]);
-
-  const resetBreakDelay = useCallback(() => {
-    if (!isHoldingRef.current || hasFirstBrokenRef.current) return;
-    if (breakDelayRef.current) {
-      clearTimeout(breakDelayRef.current);
-      breakDelayRef.current = setTimeout(() => {
-        if (!isHoldingRef.current) return;
-        hasFirstBrokenRef.current = true;
-        breakBlock(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
-        breakIntervalRef.current = setInterval(() => {
-          if (isHoldingRef.current) {
-            breakBlock(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
-          }
-        }, 300);
-      }, 400);
-    }
-  }, [breakBlock]);
+  }, [startMining]);
 
   const handleLookTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
@@ -451,29 +507,32 @@ export function MinecraftGame() {
         camRef.current.pitch = Math.max(-1.4, Math.min(1.4,
           lookTouchRef.current.startPitch + dy * -0.005
         ));
-        resetBreakDelay();
+        // If moved significantly, stop mining (looking around)
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          stopMining();
+        }
       }
     }
-  }, [clearBreakInterval, resetBreakDelay]);
+  }, [stopMining]);
 
   const handleLookTouchEnd = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (lookTouchRef.current && touch.identifier === lookTouchRef.current.id) {
-        clearBreakInterval();
         isHoldingRef.current = false;
+        stopMining();
         const elapsed = Date.now() - lookTouchRef.current.startTime;
         const dx = touch.clientX - lookTouchRef.current.startX;
         const dy = touch.clientY - lookTouchRef.current.startY;
         const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
-        if (!moved && elapsed < 300 && !craftingTableOpen) {
+        if (!moved && elapsed < 200 && !craftingTableOpen) {
           placeBlock(lookTouchRef.current.startX, lookTouchRef.current.startY);
         }
         lookTouchRef.current = null;
       }
     }
-  }, [placeBlock, clearBreakInterval, craftingTableOpen]);
+  }, [placeBlock, stopMining, craftingTableOpen]);
 
   // Keyboard controls
   useEffect(() => {
@@ -484,7 +543,6 @@ export function MinecraftGame() {
       if (e.code === 'Space' && e.type === 'keydown') {
         window.dispatchEvent(new CustomEvent('mc-jump'));
       }
-      // Number keys for slot selection
       if (e.type === 'keydown') {
         const num = parseInt(e.key);
         if (num >= 1 && num <= 9) {
@@ -526,28 +584,39 @@ export function MinecraftGame() {
     };
   }, []);
 
-  // Mouse click for desktop
+  // Desktop mouse: hold left to mine, right click to place
+  const desktopMiningRef = useRef(false);
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
       if (!document.pointerLockElement) return;
-      if (e.button === 0) breakBlock();
+      if (e.button === 0) {
+        desktopMiningRef.current = true;
+        isHoldingRef.current = true;
+        startMining();
+      }
       if (e.button === 2) { e.preventDefault(); placeBlock(); }
+    };
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button === 0) {
+        desktopMiningRef.current = false;
+        isHoldingRef.current = false;
+        stopMining();
+      }
     };
     const onContextMenu = (e: MouseEvent) => e.preventDefault();
     document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('contextmenu', onContextMenu);
     return () => {
       document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [breakBlock, placeBlock]);
+  }, [startMining, stopMining, placeBlock]);
 
   const handleJoystickMove = useCallback((state: { dx: number; dz: number }) => {
     moveRef.current = state;
-    if (state.dx !== 0 || state.dz !== 0) {
-      resetBreakDelay();
-    }
-  }, [resetBreakDelay]);
+  }, []);
 
   return (
     <div
@@ -610,6 +679,7 @@ export function MinecraftGame() {
           </svg>
         </div>
       </div>
+      <MiningOverlay progress={miningProgress} visible={miningActive} />
       <HotBar inventory={inventory} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onOpenInventory={() => setInventoryOpen(true)} />
       {inventoryOpen && (
         <InventoryScreen

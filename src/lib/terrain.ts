@@ -110,6 +110,23 @@ export const BLOCK_NAMES: Record<number, string> = {
   [BLOCK_TYPES.CRAFTING_TABLE]: 'Établi',
 };
 
+// Break time in seconds per block type
+export const BLOCK_BREAK_TIME: Record<number, number> = {
+  [BLOCK_TYPES.GRASS]: 0.75,
+  [BLOCK_TYPES.DIRT]: 0.75,
+  [BLOCK_TYPES.STONE]: 11,
+  [BLOCK_TYPES.WOOD]: 3,
+  [BLOCK_TYPES.SAND]: 0.75,
+  [BLOCK_TYPES.LEAVES]: 0.3,
+  [BLOCK_TYPES.SNOW]: 0.75,
+  [BLOCK_TYPES.PLANKS]: 3,
+  [BLOCK_TYPES.CRAFTING_TABLE]: 3,
+};
+
+export function getBlockBreakTime(blockType: number): number {
+  return BLOCK_BREAK_TIME[blockType] ?? 1;
+}
+
 export function getItemOrBlockName(id: number): string {
   if (isItem(id)) return ITEM_NAMES[id] || '';
   return BLOCK_NAMES[id] || '';
