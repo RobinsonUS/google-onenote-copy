@@ -320,6 +320,7 @@ export function MinecraftGame() {
   } | null>(null);
   const [miningProgress, setMiningProgress] = useState(0);
   const [miningActive, setMiningActive] = useState(false);
+  const [miningPos, setMiningPos] = useState<{ x: number; y: number } | undefined>(undefined);
   const miningRafRef = useRef<number | null>(null);
   const holdTouchPosRef = useRef({ x: 0, y: 0 });
   const isHoldingRef = useRef(false);
@@ -352,9 +353,16 @@ export function MinecraftGame() {
     }
     const key = posKey(result.x, result.y, result.z);
     const mining = miningRef.current;
-    // If already mining the same block, continue
-    if (mining && mining.active && mining.targetKey === key) return;
-    // Start mining new block
+    // If already mining the same block, just update screen pos
+    if (mining && mining.active && mining.targetKey === key) {
+      if (screenX !== undefined && screenY !== undefined) {
+        mining.screenX = screenX;
+        mining.screenY = screenY;
+        setMiningPos({ x: screenX, y: screenY });
+      }
+      return;
+    }
+    // Start mining new block (reset progress)
     miningRef.current = {
       active: true,
       targetKey: key,
@@ -365,6 +373,7 @@ export function MinecraftGame() {
     };
     setMiningActive(true);
     setMiningProgress(0);
+    setMiningPos(screenX !== undefined && screenY !== undefined ? { x: screenX, y: screenY } : undefined);
     // Start the mining loop
     if (!miningRafRef.current) {
       miningRafRef.current = requestAnimationFrame(miningLoop);
@@ -389,6 +398,30 @@ export function MinecraftGame() {
       setMiningProgress(0);
       return;
     }
+
+    // Re-raycast to check if we're still aiming at the same block
+    let currentKey: string | null = null;
+    if (mining.screenX !== undefined && mining.screenY !== undefined && cameraRef.current) {
+      const result = screenRaycast(mining.screenX, mining.screenY, cameraRef.current, worldRef.current);
+      if (result?.hit) currentKey = posKey(result.x, result.y, result.z);
+    } else {
+      const result = raycastBlock(camPosRef.current, camRef.current.yaw, camRef.current.pitch, worldRef.current);
+      if (result?.hit) currentKey = posKey(result.x, result.y, result.z);
+    }
+
+    // If target changed, restart mining on new block
+    if (currentKey !== mining.targetKey) {
+      miningRef.current = null;
+      miningRafRef.current = null;
+      if (isHoldingRef.current) {
+        startMining(mining.screenX, mining.screenY);
+      } else {
+        setMiningActive(false);
+        setMiningProgress(0);
+      }
+      return;
+    }
+
     const now = performance.now();
     const dt = (now - mining.lastTime) / 1000;
     mining.lastTime = now;
@@ -413,7 +446,6 @@ export function MinecraftGame() {
       miningRef.current = null;
       setMiningProgress(0);
       if (isHoldingRef.current) {
-        // Re-target next block
         setTimeout(() => {
           if (isHoldingRef.current) {
             startMining(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
@@ -507,13 +539,15 @@ export function MinecraftGame() {
         camRef.current.pitch = Math.max(-1.4, Math.min(1.4,
           lookTouchRef.current.startPitch + dy * -0.005
         ));
-        // If moved significantly, stop mining (looking around)
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-          stopMining();
+        // If mining, update the screen position and re-target
+        if (miningRef.current?.active) {
+          miningRef.current.screenX = touch.clientX;
+          miningRef.current.screenY = touch.clientY;
+          setMiningPos({ x: touch.clientX, y: touch.clientY });
         }
       }
     }
-  }, [stopMining]);
+  }, []);
 
   const handleLookTouchEnd = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
@@ -679,7 +713,7 @@ export function MinecraftGame() {
           </svg>
         </div>
       </div>
-      <MiningOverlay progress={miningProgress} visible={miningActive} />
+      <MiningOverlay progress={miningProgress} visible={miningActive} x={miningPos?.x} y={miningPos?.y} />
       <HotBar inventory={inventory} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onOpenInventory={() => setInventoryOpen(true)} />
       {inventoryOpen && (
         <InventoryScreen

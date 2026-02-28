@@ -3,9 +3,11 @@ import { memo } from "react";
 interface MiningOverlayProps {
   progress: number; // 0 to 1
   visible: boolean;
+  x?: number;
+  y?: number;
 }
 
-export const MiningOverlay = memo(function MiningOverlay({ progress, visible }: MiningOverlayProps) {
+export const MiningOverlay = memo(function MiningOverlay({ progress, visible, x, y }: MiningOverlayProps) {
   if (!visible || progress <= 0) return null;
 
   const size = 48;
@@ -14,17 +16,12 @@ export const MiningOverlay = memo(function MiningOverlay({ progress, visible }: 
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - progress);
 
+  const posStyle = x !== undefined && y !== undefined
+    ? { position: "fixed" as const, left: x, top: y, transform: "translate(-50%, -50%)", zIndex: 50, pointerEvents: "none" as const }
+    : { position: "fixed" as const, top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 50, pointerEvents: "none" as const };
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        zIndex: 50,
-        pointerEvents: "none",
-      }}
-    >
+    <div style={posStyle}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
         {/* Background circle */}
         <circle
