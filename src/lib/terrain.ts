@@ -112,11 +112,11 @@ export const BLOCK_NAMES: Record<number, string> = {
 
 // Break time in seconds per block type
 export const BLOCK_BREAK_TIME: Record<number, number> = {
-  [BLOCK_TYPES.GRASS]: 0.75,
-  [BLOCK_TYPES.DIRT]: 0.75,
+  [BLOCK_TYPES.GRASS]: 0.7,
+  [BLOCK_TYPES.DIRT]: 0.7,
   [BLOCK_TYPES.STONE]: 11,
   [BLOCK_TYPES.WOOD]: 3,
-  [BLOCK_TYPES.SAND]: 0.75,
+  [BLOCK_TYPES.SAND]: 0.7,
   [BLOCK_TYPES.LEAVES]: 0.3,
   [BLOCK_TYPES.SNOW]: 0.75,
   [BLOCK_TYPES.PLANKS]: 3,

@@ -10,7 +10,7 @@ interface MiningOverlayProps {
 export const MiningOverlay = memo(function MiningOverlay({ progress, visible, x, y }: MiningOverlayProps) {
   if (!visible || progress <= 0) return null;
 
-  const size = 48;
+  const size = 96;
   const strokeWidth = 4;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;

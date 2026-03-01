@@ -517,12 +517,12 @@ export function MinecraftGame() {
         holdTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
         isHoldingRef.current = true;
 
-        // Start mining after a small delay to distinguish from tap
+        // Wait 0.75s before starting to mine (initial hold delay)
         setTimeout(() => {
           if (isHoldingRef.current && lookTouchRef.current) {
             startMining(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
           }
-        }, 200);
+        }, 750);
       }
     }
   }, [startMining]);
@@ -560,8 +560,14 @@ export function MinecraftGame() {
         const dx = touch.clientX - lookTouchRef.current.startX;
         const dy = touch.clientY - lookTouchRef.current.startY;
         const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
-        if (!moved && elapsed < 200 && !craftingTableOpen) {
-          placeBlock(lookTouchRef.current.startX, lookTouchRef.current.startY);
+        if (!moved && elapsed < 750 && !craftingTableOpen) {
+          // Check if tapping on a crafting table (open menu regardless of held item)
+          const tapResult = screenRaycast(lookTouchRef.current.startX, lookTouchRef.current.startY, cameraRef.current!, worldRef.current);
+          if (tapResult?.hit && tapResult.blockType === BLOCK_TYPES.CRAFTING_TABLE) {
+            setCraftingTableOpen(true);
+          } else {
+            placeBlock(lookTouchRef.current.startX, lookTouchRef.current.startY);
+          }
         }
         lookTouchRef.current = null;
       }
