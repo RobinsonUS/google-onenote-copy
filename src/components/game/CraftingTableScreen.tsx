@@ -7,6 +7,7 @@ import { TOTAL_SLOTS } from "./InventoryScreen";
 
 const ITEM_TEXTURES: Record<number, string> = {
   [ITEM_TYPES.STICK]: '/textures/stick.webp',
+  [ITEM_TYPES.WOODEN_AXE]: '/textures/wooden_axe.png',
 };
 
 function SmallBlockIcon({ blockType }: { blockType: number }) {
@@ -28,7 +29,7 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
       height={40}
       draggable={false}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none' }}
+      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none', mixBlendMode: isItem(blockType) ? 'multiply' : undefined }}
     />
   );
 }
@@ -146,6 +147,30 @@ export function CraftingTableScreen({ inventory, onInventoryChange, onClose, sel
           if (slots[tl] === BLOCK_TYPES.PLANKS && slots[tr] === BLOCK_TYPES.PLANKS &&
               slots[bl] === BLOCK_TYPES.PLANKS && slots[br] === BLOCK_TYPES.PLANKS) {
             return { blockType: BLOCK_TYPES.CRAFTING_TABLE, count: 1 };
+          }
+        }
+      }
+    }
+
+    // Wooden axe: plank-plank-null / plank-stick-null / null-stick-null
+    // Only works in the 3x3 grid (must match exact pattern at some position)
+    if (filledSlots.length === 5) {
+      for (let row = 0; row < 1; row++) {
+        for (let col = 0; col < 2; col++) {
+          const r0c0 = row * 3 + col;
+          const r0c1 = row * 3 + col + 1;
+          const r1c0 = (row + 1) * 3 + col;
+          const r1c1 = (row + 1) * 3 + col + 1;
+          const r2c1 = (row + 2) * 3 + col + 1;
+          if (
+            slots[r0c0] === BLOCK_TYPES.PLANKS && slots[r0c1] === BLOCK_TYPES.PLANKS &&
+            slots[r1c0] === BLOCK_TYPES.PLANKS && slots[r1c1] === ITEM_TYPES.STICK &&
+            slots[r2c1] === ITEM_TYPES.STICK
+          ) {
+            // Verify no other slots filled
+            const usedIndices = new Set([r0c0, r0c1, r1c0, r1c1, r2c1]);
+            const others = slots.filter((s, i) => !usedIndices.has(i) && s !== null);
+            if (others.length === 0) return { blockType: ITEM_TYPES.WOODEN_AXE, count: 1 };
           }
         }
       }

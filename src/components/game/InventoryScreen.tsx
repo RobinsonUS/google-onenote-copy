@@ -6,6 +6,7 @@ import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRendere
 // Map item IDs to their texture paths
 const ITEM_TEXTURES: Record<number, string> = {
   [ITEM_TYPES.STICK]: '/textures/stick.webp',
+  [ITEM_TYPES.WOODEN_AXE]: '/textures/wooden_axe.png',
 };
 
 function SmallBlockIcon({ blockType }: { blockType: number }) {
@@ -27,7 +28,7 @@ function SmallBlockIcon({ blockType }: { blockType: number }) {
       height={40}
       draggable={false}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none' }}
+      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none', mixBlendMode: isItem(blockType) ? 'multiply' : undefined }}
     />
   );
 }
