@@ -5,6 +5,7 @@ import { renderBlockIconToDataURL, clearIconCache } from "@/lib/blockIconRendere
 
 const ITEM_TEXTURES: Record<number, string> = {
   [ITEM_TYPES.STICK]: '/textures/stick.webp',
+  [ITEM_TYPES.WOODEN_AXE]: '/textures/wooden_axe.png',
 };
 
 export interface InventorySlot {
@@ -67,7 +68,7 @@ function BlockIcon({ blockType }: { blockType: number }) {
       src={src}
       width={40}
       height={40}
-      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)' }}
+      style={{ imageRendering: 'auto', display: 'block', filter: isItem(blockType) ? 'none' : 'saturate(1.45) brightness(1.1)', mixBlendMode: isItem(blockType) ? 'multiply' : undefined }}
     />
   );
 }

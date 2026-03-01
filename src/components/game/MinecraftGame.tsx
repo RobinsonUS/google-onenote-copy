@@ -290,6 +290,10 @@ export function MinecraftGame() {
   const [worldVersion, setWorldVersion] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inventory, setInventory] = useState<InventorySlot[]>(createFullInventory());
+  const inventoryRef = useRef(inventory);
+  inventoryRef.current = inventory;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [craftingTableOpen, setCraftingTableOpen] = useState(false);
   const moveRef   = useRef({ dx: 0, dz: 0 });
@@ -427,7 +431,8 @@ export function MinecraftGame() {
     mining.lastTime = now;
     mining.elapsed += dt;
 
-    const breakTime = getBlockBreakTime(mining.blockType);
+    const heldBlockType = inventoryRef.current[selectedIndexRef.current]?.blockType ?? null;
+    const breakTime = getBlockBreakTime(mining.blockType, heldBlockType);
     const progress = Math.min(mining.elapsed / breakTime, 1);
     setMiningProgress(progress);
 
@@ -469,9 +474,6 @@ export function MinecraftGame() {
   }, [miningLoop]);
 
   // Place block: use inventory
-  const inventoryRef = useRef(inventory);
-  inventoryRef.current = inventory;
-
   const placeBlock = useCallback((screenX?: number, screenY?: number) => {
     const slot = inventoryRef.current[selectedIndex];
     if (!slot || slot.blockType === null || slot.count <= 0) return;
@@ -517,12 +519,12 @@ export function MinecraftGame() {
         holdTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
         isHoldingRef.current = true;
 
-        // Wait 0.75s before starting to mine (initial hold delay)
+        // Wait 1s before starting to mine (initial hold delay)
         setTimeout(() => {
           if (isHoldingRef.current && lookTouchRef.current) {
             startMining(holdTouchPosRef.current.x, holdTouchPosRef.current.y);
           }
-        }, 750);
+        }, 1000);
       }
     }
   }, [startMining]);
@@ -560,7 +562,7 @@ export function MinecraftGame() {
         const dx = touch.clientX - lookTouchRef.current.startX;
         const dy = touch.clientY - lookTouchRef.current.startY;
         const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
-        if (!moved && elapsed < 750 && !craftingTableOpen) {
+        if (!moved && elapsed < 1000 && !craftingTableOpen) {
           // Check if tapping on a crafting table (open menu regardless of held item)
           const tapResult = screenRaycast(lookTouchRef.current.startX, lookTouchRef.current.startY, cameraRef.current!, worldRef.current);
           if (tapResult?.hit && tapResult.blockType === BLOCK_TYPES.CRAFTING_TABLE) {

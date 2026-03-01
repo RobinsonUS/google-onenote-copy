@@ -58,6 +58,7 @@ export const BLOCK_TYPES = {
 // Non-block items (IDs >= 100, cannot be placed in the world)
 export const ITEM_TYPES = {
   STICK: 100,
+  WOODEN_AXE: 101,
 } as const;
 
 export type ItemType = typeof ITEM_TYPES[keyof typeof ITEM_TYPES];
@@ -68,6 +69,7 @@ export function isItem(id: number): boolean {
 
 export const ITEM_NAMES: Record<number, string> = {
   [ITEM_TYPES.STICK]: 'Bâton',
+  [ITEM_TYPES.WOODEN_AXE]: 'Hache en bois',
 };
 
 export type BlockType = typeof BLOCK_TYPES[keyof typeof BLOCK_TYPES];
@@ -115,16 +117,23 @@ export const BLOCK_BREAK_TIME: Record<number, number> = {
   [BLOCK_TYPES.GRASS]: 0.7,
   [BLOCK_TYPES.DIRT]: 0.7,
   [BLOCK_TYPES.STONE]: 11,
-  [BLOCK_TYPES.WOOD]: 3,
+  [BLOCK_TYPES.WOOD]: 4,
   [BLOCK_TYPES.SAND]: 0.7,
   [BLOCK_TYPES.LEAVES]: 0.3,
   [BLOCK_TYPES.SNOW]: 0.75,
-  [BLOCK_TYPES.PLANKS]: 3,
-  [BLOCK_TYPES.CRAFTING_TABLE]: 3,
+  [BLOCK_TYPES.PLANKS]: 4,
+  [BLOCK_TYPES.CRAFTING_TABLE]: 4,
 };
 
-export function getBlockBreakTime(blockType: number): number {
-  return BLOCK_BREAK_TIME[blockType] ?? 1;
+// Wood-type blocks that the axe speeds up
+const WOOD_BLOCKS = new Set<number>([BLOCK_TYPES.WOOD, BLOCK_TYPES.PLANKS, BLOCK_TYPES.CRAFTING_TABLE]);
+
+export function getBlockBreakTime(blockType: number, heldItem?: number | null): number {
+  const base = BLOCK_BREAK_TIME[blockType] ?? 1;
+  if (heldItem === ITEM_TYPES.WOODEN_AXE && WOOD_BLOCKS.has(blockType)) {
+    return 2; // Axe cuts wood in 2s instead of 4s
+  }
+  return base;
 }
 
 export function getItemOrBlockName(id: number): string {
